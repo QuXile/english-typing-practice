@@ -593,26 +593,6 @@ input:focus-visible,
   border-radius: 3px;
 }
 
-.caret {
-  display: inline-block;
-  width: 2px;
-  height: 1.08em;
-  margin: 0 1px -0.16em;
-  border-radius: 2px;
-  background: var(--brand);
-  animation: caret-blink 1.05s step-end infinite;
-}
-
-.typing-input {
-  position: fixed;
-  top: 0;
-  left: -9999px;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
 .focus-hint {
   position: absolute;
   right: 22px;
@@ -786,17 +766,6 @@ input:focus-visible,
   }
   to {
     opacity: 1;
-  }
-}
-
-@keyframes caret-blink {
-  0%,
-  45% {
-    opacity: 1;
-  }
-  50%,
-  100% {
-    opacity: 0;
   }
 }
 
@@ -1392,4 +1361,40 @@ input:focus-visible,
 .newline-marker--skipped {
   color: var(--muted);
   opacity: 0.35;
+}
+
+/* ---------- 手写行：原生光标/选择叠层 ---------- */
+
+.typed-line--native {
+  position: relative;
+}
+
+.typed-line__mirror {
+  pointer-events: none;
+}
+
+.typed-line__input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--brand);
+  font: inherit;
+  letter-spacing: 0;
+  white-space: pre;
+  overflow: hidden;
+  outline: none;
+  cursor: text;
+}
+
+.typed-line__input::selection {
+  background: rgba(79, 110, 247, 0.16);
+  color: transparent;
 }
