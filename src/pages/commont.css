@@ -1510,3 +1510,10 @@ input:focus-visible,
     margin-top: 3px;
   }
 }
+
+/* 输入时当前词与点击选中的高亮保持一致 */
+.word--current,
+.word--pinned {
+  background: #e9edff;
+  box-shadow: 0 0 0 1.5px rgba(79, 110, 247, 0.45);
+}

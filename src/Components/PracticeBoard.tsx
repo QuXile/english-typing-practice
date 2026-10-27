@@ -11,6 +11,7 @@ import type {
 } from '../utils/text';
 import {
   buildTypingModel,
+  classifyChar,
   findNextLineWithTargets,
   findPreviousLineWithTargets,
   formatDuration,
@@ -35,10 +36,8 @@ export interface SessionSummary {
 }
 
 interface LineState {
-  /** 已输入的正文字符（不含换行符） */
+  /** 已输入字符，下标与 line.chars 的视觉位置一一对应（包含自动跳过的字符和 ↵） */
   typed: string;
-  /** 段末换行符是否已经按 Enter */
-  enterDone: boolean;
   done: boolean;
 }
 
@@ -54,16 +53,39 @@ export interface PracticeBoardProps {
   onExit: () => void;
 }
 
-function textTargetCount(line: TypingLine): number {
-  let count = 0;
-  for (const target of line.targets) {
-    if (target.char !== '\n') count += 1;
+function leadingSkippedText(line: TypingLine): string {
+  let text = '';
+  for (const char of line.chars) {
+    if (!char.skipped) break;
+    text += displaySourceChar(char.char);
   }
-  return count;
+  return text;
 }
 
-function newlineTargetIndex(line: TypingLine): number {
-  return line.targets.findIndex((target) => target.char === '\n');
+/** 把当前位置之后连续的“跳过字符”自动补进输入值 */
+function appendSkippedText(line: TypingLine, typed: string): string {
+  let value = typed.slice(0, line.chars.length);
+  let position = value.length;
+  while (position < line.chars.length && line.chars[position].skipped) {
+    value += displaySourceChar(line.chars[position].char);
+    position += 1;
+  }
+  return value;
+}
+
+/** 光标附近的单词序号，用于原文单词高亮和释义卡片 */
+function wordIndexAtCaret(line: TypingLine, caret: number): number | null {
+  const start = Math.max(0, Math.min(caret, line.chars.length - 1));
+  if (line.chars[start]?.wordIndex !== null && line.chars[start]?.wordIndex !== undefined) {
+    return line.chars[start].wordIndex;
+  }
+  for (let i = start - 1; i >= 0; i -= 1) {
+    if (line.chars[i].wordIndex !== null) return line.chars[i].wordIndex;
+  }
+  for (let i = start + 1; i < line.chars.length; i += 1) {
+    if (line.chars[i].wordIndex !== null) return line.chars[i].wordIndex;
+  }
+  return null;
 }
 
 function aggregateSummary(model: TypingModel, lineStates: LineState[], elapsedMs: number): SessionSummary {
@@ -75,17 +97,11 @@ function aggregateSummary(model: TypingModel, lineStates: LineState[], elapsedMs
     const state = lineStates[index];
     if (!state) return;
 
-    line.targets.forEach((target, targetIndex) => {
-      if (target.char === '\n') {
-        if (state.enterDone) {
-          typedChars += 1;
-          correctChars += 1;
-        }
-        return;
-      }
-      if (targetIndex >= state.typed.length) return;
+    line.chars.forEach((char, cell) => {
+      if (char.skipped) return;
+      if (cell >= state.typed.length) return;
       typedChars += 1;
-      if (state.typed[targetIndex] === target.char) correctChars += 1;
+      if (state.typed[cell] === displaySourceChar(char.char)) correctChars += 1;
       else errors += 1;
     });
   });
@@ -128,7 +144,6 @@ export default function PracticeBoard({
   const [lineStates, setLineStates] = useState<LineState[]>(() =>
     model.lines.map((line) => ({
       typed: '',
-      enterDone: false,
       done: line.targets.length === 0,
     })),
   );
@@ -143,19 +158,14 @@ export default function PracticeBoard({
   const [autoAnchor, setAutoAnchor] = useState<HTMLElement | null>(null);
 
   const lineInputRef = useRef<HTMLInputElement>(null);
+  const pendingSelectionRef = useRef<number | null>(null);
   const wordRefs = useRef(new Map<number, HTMLElement>());
   const scrollRef = useRef<HTMLDivElement>(null);
   const startTimeRef = useRef<number | null>(null);
 
   const currentLine = lineIndex >= 0 ? model.lines[lineIndex] : undefined;
   const currentState = lineIndex >= 0 ? lineStates[lineIndex] : undefined;
-  const currentTextCount = currentLine ? textTargetCount(currentLine) : 0;
-
-  const activeTargetIndex = currentLine
-    ? Math.max(0, Math.min(caret, currentLine.targets.length - 1))
-    : -1;
-  const currentTarget = activeTargetIndex >= 0 ? currentLine?.targets[activeTargetIndex] : undefined;
-  const autoWordIndex = currentTarget?.activeWordIndex ?? null;
+  const autoWordIndex = currentLine ? wordIndexAtCaret(currentLine, caret) : null;
   const activeWordIndex = pinned?.wordIndex ?? autoWordIndex;
   const activeWord = activeWordIndex !== null ? model.words[activeWordIndex] : undefined;
   const activeEntry: DictionaryEntry | undefined = activeWord
@@ -172,12 +182,23 @@ export default function PracticeBoard({
   useLayoutEffect(() => {
     const input = lineInputRef.current;
     if (!input || !currentLine) return;
+    pendingSelectionRef.current = null;
     input.focus({ preventScroll: true });
     const position = Math.min(currentState?.typed.length ?? 0, input.value.length);
     input.setSelectionRange(position, position);
     setCaret(position);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lineIndex]);
+
+  // 自定义输入/自动跳过字符后，把原生光标放到正确的字符位
+  useLayoutEffect(() => {
+    const input = lineInputRef.current;
+    const position = pendingSelectionRef.current;
+    if (!input || position === null) return;
+    pendingSelectionRef.current = null;
+    input.setSelectionRange(position, position);
+    setCaret(position);
+  }, [lineStates, lineIndex]);
 
   useLayoutEffect(() => {
     if (pinned) {
@@ -241,14 +262,15 @@ export default function PracticeBoard({
     onFinish(summary);
   }
 
-  function completeLine(typed: string, enterDone: boolean) {
+  function completeLine(typed: string) {
     if (!currentLine) return;
     markStarted();
     setPinned(null);
     setCardDismissed(false);
+    pendingSelectionRef.current = null;
 
     const nextStates = lineStates.slice();
-    nextStates[currentLine.index] = { typed, enterDone, done: true };
+    nextStates[currentLine.index] = { typed, done: true };
     const nextLine = findNextLineWithTargets(model, currentLine.index + 1);
     if (nextLine < 0) {
       finish(nextStates);
@@ -258,23 +280,57 @@ export default function PracticeBoard({
     setLineIndex(nextLine);
   }
 
-  function handleTypedChange(value: string, nextCaret: number) {
-    if (!currentLine || status === 'finished') return;
-    const max = textTargetCount(currentLine);
-    const typed = value.slice(0, max);
+  function applyTyped(typed: string, selection: number) {
+    if (!currentLine) return;
+    const value = typed.slice(0, currentLine.chars.length);
     markStarted();
     setPinned(null);
     setCardDismissed(false);
 
-    if (typed.length >= max && newlineTargetIndex(currentLine) < 0) {
-      completeLine(typed, false);
+    if (value.length >= currentLine.chars.length) {
+      completeLine(value);
       return;
     }
 
     const nextStates = lineStates.slice();
-    nextStates[currentLine.index] = { typed, enterDone: false, done: false };
+    nextStates[currentLine.index] = { typed: value, done: false };
+    const position = Math.max(0, Math.min(selection, value.length));
+    pendingSelectionRef.current = position;
     setLineStates(nextStates);
-    setCaret(Math.min(nextCaret, typed.length));
+    setCaret(position);
+  }
+
+  /**
+   * 统一处理输入：
+   * - 第一笔输入时自动补上行首的跳过字符；
+   * - 自动补上当前位置后面连续的跳过字符；
+   * - 输入长度达到整行视觉字符数后自动进入下一行。
+   */
+  function normalizeInput(raw: string, caret: number, atEnd: boolean) {
+    if (!currentLine) return;
+    let typed = raw.slice(0, currentLine.chars.length);
+    let position = caret;
+
+    if ((currentState?.typed.length ?? 0) === 0) {
+      const prefix = leadingSkippedText(currentLine);
+      if (prefix && !typed.startsWith(prefix)) {
+        typed = prefix + typed;
+        position += prefix.length;
+      }
+    }
+
+    const beforeAuto = typed.length;
+    typed = appendSkippedText(currentLine, typed);
+    if (atEnd || position >= beforeAuto) {
+      position = typed.length;
+    }
+
+    applyTyped(typed, Math.min(position, typed.length));
+  }
+
+  function handleNativeInput(value: string, caret: number) {
+    if (!currentLine || status === 'finished') return;
+    normalizeInput(value, caret, caret >= value.length);
   }
 
   function handleInputSelect() {
@@ -288,98 +344,154 @@ export default function PracticeBoard({
     const previousLine = findPreviousLineWithTargets(model, lineIndex - 1);
     if (previousLine < 0) return;
     const previousState = lineStates[previousLine];
+    const previousLineModel = model.lines[previousLine];
+    let previousTyped = previousState?.typed ?? '';
+    let position = previousTyped.length;
+    do {
+      if (position <= 0) break;
+      const wasSkipped = Boolean(previousLineModel.chars[position - 1]?.skipped);
+      previousTyped = previousTyped.slice(0, position - 1) + previousTyped.slice(position);
+      position -= 1;
+      if (!wasSkipped) break;
+    } while (position > 0);
+
     const nextStates = lineStates.slice();
     nextStates[previousLine] = {
-      typed: previousState?.typed ?? '',
-      enterDone: false,
+      typed: previousTyped,
       done: false,
     };
+    pendingSelectionRef.current = null;
     setLineStates(nextStates);
     setLineIndex(previousLine);
   }
 
-  function handleEnter() {
-    if (!currentLine || !currentState || status === 'finished') return;
-    if (currentState.typed.length < currentTextCount) return;
+  function handleBackspace() {
+    if (!currentLine || status === 'finished') return;
+    const input = lineInputRef.current;
+    const start = input?.selectionStart ?? 0;
+    const end = input?.selectionEnd ?? start;
+    const typed = currentState?.typed ?? '';
 
-    const newlineIndex = newlineTargetIndex(currentLine);
-    if (newlineIndex >= 0) {
-      completeLine(currentState.typed, true);
+    if (start !== end) {
+      const nextTyped = typed.slice(0, start) + typed.slice(end);
+      applyTyped(nextTyped, start);
       return;
     }
 
-    // 跳过换行符的行，或回到已完成的正文行后再次按 Enter
-    if (currentState.typed.length >= currentTextCount) {
-      completeLine(currentState.typed, false);
+    if (start === 0) {
+      if (typed.length === 0) goToPreviousLine();
+      return;
     }
+
+    // 如果被退格的字符是自动跳过的，继续退格，直到退掉一个正常字符
+    let nextTyped = typed;
+    let position = start;
+    do {
+      const index = position - 1;
+      if (index < 0) break;
+      const wasSkipped = Boolean(currentLine.chars[index]?.skipped);
+      nextTyped = nextTyped.slice(0, index) + nextTyped.slice(index + 1);
+      position = index;
+      if (!wasSkipped) break;
+    } while (position > 0);
+
+    applyTyped(nextTyped, position);
+  }
+
+  function handleDelete() {
+    if (!currentLine || status === 'finished') return;
+    const input = lineInputRef.current;
+    const start = input?.selectionStart ?? 0;
+    const end = input?.selectionEnd ?? start;
+    const typed = currentState?.typed ?? '';
+
+    if (start === end && start >= typed.length) return;
+    const nextTyped = typed.slice(0, start) + typed.slice(end);
+    applyTyped(nextTyped, start);
   }
 
   function handleInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.nativeEvent.isComposing || status === 'finished') return;
+    if (event.nativeEvent.isComposing || status === 'finished' || !currentLine) return;
+
+    const input = lineInputRef.current;
+    const start = input?.selectionStart ?? 0;
+    const end = input?.selectionEnd ?? start;
+    const typed = currentState?.typed ?? '';
 
     if (event.key === 'Enter') {
       event.preventDefault();
-      handleEnter();
+      if (skipSettings.newline) return;
+      const raw = typed.slice(0, start) + '↵' + typed.slice(end);
+      normalizeInput(raw, start + 1, end >= typed.length);
       return;
     }
 
     if (event.key === 'Backspace') {
-      const input = lineInputRef.current;
-      const start = input?.selectionStart ?? 0;
-      const end = input?.selectionEnd ?? 0;
-      if (start === 0 && end === 0 && (currentState?.typed.length ?? 0) === 0) {
-        event.preventDefault();
-        goToPreviousLine();
-      }
+      event.preventDefault();
+      handleBackspace();
+      return;
+    }
+
+    if (event.key === 'Delete') {
+      event.preventDefault();
+      handleDelete();
       return;
     }
 
     if (event.key === 'Escape') {
       setPinned(null);
       setCardDismissed(true);
+      return;
     }
+
+    if (event.ctrlKey || event.metaKey) return;
+    if (event.key.length !== 1) return;
+
+    const category = classifyChar(event.key);
+    if (
+      category !== 'letter' &&
+      category !== 'other' &&
+      category !== 'newline' &&
+      skipSettings[category]
+    ) {
+      // 已经设置为跳过的字符会自动填入，不重复接受手动输入
+      event.preventDefault();
+      return;
+    }
+
+    event.preventDefault();
+    const raw = typed.slice(0, start) + event.key + typed.slice(end);
+    normalizeInput(raw, start + 1, end >= typed.length);
   }
 
-  function sourceCharClass(line: TypingLine, state: LineState, isCurrent: boolean, index: number): string {
+  function sourceCharClass(line: TypingLine, state: LineState, index: number): string {
     const char = line.chars[index];
     if (char.skipped) return 'source-char source-char--skipped';
 
-    const targetIndex = char.targetIndex;
-    if (targetIndex === null) return 'source-char';
-
-    const target = line.targets[targetIndex];
-    if (target.char === '\n') {
-      if (state.enterDone) return 'source-char source-char--ok';
-      if (isCurrent && state.typed.length >= textTargetCount(line)) {
-        return 'source-char source-char--current';
-      }
-      return 'source-char';
-    }
-
-    const value = state.typed[targetIndex];
+    const value = state.typed[index];
     if (value === undefined) return 'source-char';
-    return value === target.char
+    return value === displaySourceChar(char.char)
       ? 'source-char source-char--ok'
       : 'source-char source-char--bad';
   }
 
-  function renderSourceChar(line: TypingLine, state: LineState, isCurrent: boolean, index: number): ReactNode {
+  function renderSourceChar(line: TypingLine, state: LineState, index: number): ReactNode {
     const char = line.chars[index];
     return (
-      <span key={`src-${index}`} className={sourceCharClass(line, state, isCurrent, index)}>
+      <span key={`src-${index}`} className={sourceCharClass(line, state, index)}>
         {displaySourceChar(char.char)}
       </span>
     );
   }
 
-  function renderSourceLine(line: TypingLine, state: LineState, isCurrent: boolean): ReactNode[] {
+  function renderSourceLine(line: TypingLine, state: LineState): ReactNode[] {
     const nodes: ReactNode[] = [];
     let index = 0;
 
     while (index < line.chars.length) {
       const char = line.chars[index];
       if (char.wordIndex === null) {
-        nodes.push(renderSourceChar(line, state, isCurrent, index));
+        nodes.push(renderSourceChar(line, state, index));
         index += 1;
         continue;
       }
@@ -387,7 +499,7 @@ export default function PracticeBoard({
       const wordIndex = char.wordIndex;
       const chars: ReactNode[] = [];
       while (index < line.chars.length && line.chars[index].wordIndex === wordIndex) {
-        chars.push(renderSourceChar(line, state, isCurrent, index));
+        chars.push(renderSourceChar(line, state, index));
         index += 1;
       }
 
@@ -559,7 +671,7 @@ export default function PracticeBoard({
             const state = lineStates[line.index];
             const isCurrent = line.index === lineIndex;
             const isDone = Boolean(state?.done);
-            const max = textTargetCount(line);
+            const max = line.chars.length;
 
             return (
               <div
@@ -569,7 +681,7 @@ export default function PracticeBoard({
                 data-line-index={line.index}
                 key={line.index}
               >
-                <div className="source-line">{renderSourceLine(line, state, isCurrent)}</div>
+                <div className="source-line">{renderSourceLine(line, state)}</div>
                 <input
                   ref={isCurrent ? lineInputRef : undefined}
                   className={`line-input${isCurrent ? ' line-input--current' : isDone ? ' line-input--done' : ' line-input--pending'}`}
@@ -582,7 +694,7 @@ export default function PracticeBoard({
                     isCurrent
                       ? (event) => {
                           const input = event.currentTarget;
-                          handleTypedChange(input.value, input.selectionStart ?? input.value.length);
+                          handleNativeInput(input.value, input.selectionStart ?? input.value.length);
                         }
                       : undefined
                   }
