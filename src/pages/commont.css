@@ -1398,3 +1398,115 @@ input:focus-visible,
   background: rgba(79, 110, 247, 0.16);
   color: transparent;
 }
+
+/* ---------- 原文着色 + 正常输入框 ---------- */
+
+.source-char {
+  display: inline;
+}
+
+.source-char--ok {
+  color: var(--ok);
+}
+
+.source-char--bad {
+  color: var(--err);
+  background: var(--err-soft);
+  border-radius: 3px;
+}
+
+.source-char--skipped {
+  color: #aeb8c8;
+}
+
+.source-char--current {
+  color: var(--brand);
+}
+
+.line-input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 6px 0 2px;
+  padding: 8px 10px;
+  border: 1px solid #dfe5f1;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.line-input--current {
+  border-color: var(--brand);
+  background: #f8faff;
+  box-shadow: 0 0 0 3px rgba(79, 110, 247, 0.08);
+}
+
+.line-input--done {
+  color: var(--ink-soft);
+  border-color: #e9eef7;
+  background: #fbfcff;
+}
+
+.line-input--pending {
+  border-style: dashed;
+  background: transparent;
+  color: var(--muted);
+}
+
+.line-input:read-only {
+  cursor: default;
+}
+
+@media (max-width: 780px) {
+  .line-input {
+    margin-top: 5px;
+    padding: 7px 9px;
+    font-size: 14px;
+  }
+}
+
+/* 已完成行仍保留原文颜色提示 */
+.article-row--done .source-line {
+  opacity: 1;
+}
+
+/* 原文行与输入框使用同一套等宽排版，正常英文下逐字符横向对齐 */
+.source-line {
+  height: auto;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 18px;
+  line-height: 30px;
+  letter-spacing: 0;
+}
+
+.line-input {
+  margin: 4px 0 2px;
+  padding: 6px 10px;
+  border: 1px solid #dfe5f1;
+  border-radius: 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 18px;
+  line-height: 30px;
+  letter-spacing: 0;
+}
+
+@media (max-width: 780px) {
+  .source-line,
+  .line-input {
+    padding: 5px 8px;
+    font-size: 16px;
+    line-height: 28px;
+  }
+
+  .line-input {
+    margin-top: 3px;
+  }
+}

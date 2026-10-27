@@ -96,7 +96,7 @@ export default function Index() {
               <span className="feature-list__icon">02</span>
               <div>
                 <strong>逐行对照</strong>
-                <p>原文在上、手写在下，逐字符对齐；空格、标点和段末换行默认也要自己输入。</p>
+                <p>原文在上、输入框在下，使用同一套等宽排版；正确/错误会标在原文行上。</p>
               </div>
             </li>
             <li>
