@@ -182,9 +182,13 @@ export default function PracticeBoard({
   useLayoutEffect(() => {
     const input = lineInputRef.current;
     if (!input || !currentLine) return;
+    const pending = pendingSelectionRef.current;
     pendingSelectionRef.current = null;
     input.focus({ preventScroll: true });
-    const position = Math.min(currentState?.typed.length ?? 0, input.value.length);
+    setFocused(true);
+    const typedLength = currentState?.typed.length ?? 0;
+    const requested = pending === null ? typedLength : Math.min(pending, typedLength);
+    const position = Math.min(requested, input.value.length);
     input.setSelectionRange(position, position);
     setCaret(position);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -339,6 +343,28 @@ export default function PracticeBoard({
     setCaret(input.selectionStart ?? 0);
   }
 
+  function activateLine(targetIndex: number, requestedCaret?: number) {
+    if (targetIndex === lineIndex || targetIndex < 0 || targetIndex >= model.lines.length) return;
+    const targetState = lineStates[targetIndex];
+    const targetLength = targetState?.typed.length ?? 0;
+    pendingSelectionRef.current =
+      requestedCaret === undefined ? targetLength : Math.min(requestedCaret, targetLength);
+    setPinned(null);
+    setCardDismissed(false);
+    setFocused(true);
+    setLineIndex(targetIndex);
+  }
+
+  function moveLine(direction: -1 | 1) {
+    const target =
+      direction < 0
+        ? findPreviousLineWithTargets(model, lineIndex - 1)
+        : findNextLineWithTargets(model, lineIndex + 1);
+    if (target < 0) return;
+    const requested = lineInputRef.current?.selectionStart ?? currentState?.typed.length ?? 0;
+    activateLine(target, requested);
+  }
+
   function goToPreviousLine() {
     if (!currentLine) return;
     const previousLine = findPreviousLineWithTargets(model, lineIndex - 1);
@@ -418,6 +444,12 @@ export default function PracticeBoard({
     const end = input?.selectionEnd ?? start;
     const typed = currentState?.typed ?? '';
 
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveLine(event.key === 'ArrowUp' ? -1 : 1);
+      return;
+    }
+
     if (event.key === 'Enter') {
       event.preventDefault();
       if (skipSettings.newline) return;
@@ -460,7 +492,12 @@ export default function PracticeBoard({
     }
 
     event.preventDefault();
-    const raw = typed.slice(0, start) + event.key + typed.slice(end);
+    // 回到已完成的整行修改时，光标处直接覆盖，避免把整行往后挤
+    const overwrite =
+      typed.length >= currentLine.chars.length && start === end && start < typed.length;
+    const raw = overwrite
+      ? typed.slice(0, start) + event.key + typed.slice(start + 1)
+      : typed.slice(0, start) + event.key + typed.slice(end);
     normalizeInput(raw, start + 1, end >= typed.length);
   }
 
@@ -517,9 +554,15 @@ export default function PracticeBoard({
           onMouseDown={(event) => event.preventDefault()}
           onClick={(event) => {
             event.stopPropagation();
+            const row = event.currentTarget.closest('.article-row');
+            const targetIndex = row ? Number(row.getAttribute('data-line-index')) : -1;
+            if (targetIndex >= 0 && targetIndex !== lineIndex) {
+              activateLine(targetIndex);
+            } else {
+              focusInput();
+            }
             setPinned({ wordIndex, anchor: event.currentTarget });
             setCardDismissed(false);
-            focusInput();
           }}
         >
           {chars}
@@ -680,6 +723,13 @@ export default function PracticeBoard({
                 }`}
                 data-line-index={line.index}
                 key={line.index}
+                onClick={(event) => {
+                  if (isCurrent) return;
+                  event.stopPropagation();
+                  const target = event.target as HTMLElement;
+                  const clickedInput = target.closest('.line-input') as HTMLInputElement | null;
+                  activateLine(line.index, clickedInput?.selectionStart ?? undefined);
+                }}
               >
                 <div className="source-line">{renderSourceLine(line, state)}</div>
                 <input
@@ -710,7 +760,6 @@ export default function PracticeBoard({
                         }
                       : undefined
                   }
-                  onMouseDown={isCurrent ? undefined : (event) => event.preventDefault()}
                   autoCapitalize="none"
                   autoCorrect="off"
                   autoComplete="off"

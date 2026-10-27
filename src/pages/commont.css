@@ -1517,3 +1517,12 @@ input:focus-visible,
   background: #e9edff;
   box-shadow: 0 0 0 1.5px rgba(79, 110, 247, 0.45);
 }
+
+/* 可点击切换行 */
+.article-row:not(.article-row--current) {
+  cursor: pointer;
+}
+
+.article-row:not(.article-row--current) .line-input {
+  cursor: pointer;
+}
