@@ -120,7 +120,6 @@ export default function PracticeBoard({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const wordRefs = useRef(new Map<number, HTMLElement>());
-  const rowRefs = useRef(new Map<number, HTMLElement>());
   const scrollRef = useRef<HTMLDivElement>(null);
   const startTimeRef = useRef<number | null>(null);
 
@@ -163,32 +162,25 @@ export default function PracticeBoard({
   useEffect(() => {
     if (status === 'finished') return;
     const container = scrollRef.current;
-    const row = rowRefs.current.get(lineIndex);
-    if (!container || !row) return;
+    if (!container) return;
 
-    const prev = rowRefs.current.get(lineIndex - 1);
+    if (lineIndex <= 0) {
+      container.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    // 完成一行后，把刚完成的行滚到顶部，当前行自然落在它下面一行：
+    // 每完成一行只滚动一行，同时始终保留“上一行 + 当前行”可见。
+    const prev = container.querySelector<HTMLElement>(`[data-line-index="${lineIndex - 1}"]`);
+    if (!prev) return;
+
     const containerRect = container.getBoundingClientRect();
-    const rowRect = row.getBoundingClientRect();
-    const prevRect = prev?.getBoundingClientRect();
-    const padding = 6;
+    const prevRect = prev.getBoundingClientRect();
     const currentTop = container.scrollTop;
-    const rowTop = rowRect.top - containerRect.top + currentTop;
-    const rowBottom = rowRect.bottom - containerRect.top + currentTop;
-    const prevTop = prevRect ? prevRect.top - containerRect.top + currentTop : rowTop;
+    const prevOffsetTop = prevRect.top - containerRect.top + currentTop;
     const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
-
-    // 当前行完整可见；空间允许时把上一行也留在视口里，滚到底后自然停下
-    let target = currentTop;
-    if (rowBottom > currentTop + container.clientHeight - padding) {
-      target = rowBottom - container.clientHeight + padding;
-    }
-    if (prevRect && prevTop - padding < target) {
-      target = prevTop - padding;
-    }
-    if (rowTop - padding < target) {
-      target = Math.min(rowTop - padding, rowBottom - container.clientHeight + padding);
-    }
-    target = Math.max(0, Math.min(maxScroll, target));
+    const padding = 6;
+    const target = Math.max(0, Math.min(maxScroll, prevOffsetTop - padding));
 
     if (Math.abs(target - currentTop) > 1) {
       container.scrollTo({ top: target, behavior: 'smooth' });
@@ -232,6 +224,7 @@ export default function PracticeBoard({
 
   function appendChar(char: string) {
     if (!currentLine || status === 'finished') return;
+    if (currentTarget?.category === 'newline' && char !== '\n') return;
     setPinned(null);
     setCardDismissed(false);
     markStarted();
@@ -252,11 +245,21 @@ export default function PracticeBoard({
     }
     const previousLine = findPreviousLineWithTargets(model, lineIndex - 1);
     if (previousLine < 0) return;
+
+    // 回到上一行时保留已经打出的内容，只去掉行尾的换行符；
+    // 如果上一行没有换行符（或跳过了换行），则退掉最后一个正文字符。
+    const previousState = lineStates[previousLine];
+    let restored = previousState?.typed ?? '';
+    const previousTargets = model.lines[previousLine].targets.length;
+    if (restored.length >= previousTargets) {
+      restored = restored.slice(0, -1);
+    }
+
     const nextStates = lineStates.slice();
-    nextStates[previousLine] = { typed: '', done: false };
+    nextStates[previousLine] = { typed: restored, done: false };
     setLineStates(nextStates);
     setLineIndex(previousLine);
-    setTyped('');
+    setTyped(restored);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -267,8 +270,14 @@ export default function PracticeBoard({
       handleBackspace();
       return;
     }
+    if (currentTarget?.category === 'newline') {
+      event.preventDefault();
+      if (event.key === 'Enter') {
+        appendChar('\n');
+      }
+      return;
+    }
     if (event.key === 'Enter') {
-      // 逐行模式里换行由行切换自动处理，不需要输入
       event.preventDefault();
       return;
     }
@@ -290,7 +299,7 @@ export default function PracticeBoard({
 
     const char = event.key;
     const category = classifyChar(char);
-    if (category !== 'letter' && skipSettings[category as keyof SkipSettings]) {
+    if (category !== 'letter' && category !== 'other' && skipSettings[category]) {
       // 已设置为跳过的类别，按键不进入错误统计
       event.preventDefault();
       return;
@@ -333,6 +342,10 @@ export default function PracticeBoard({
     );
   }
 
+  function displayTypingChar(value: string): string {
+    return value === '\n' ? '↵' : value;
+  }
+
   function renderTypedLine(line: TypingLine, typedText: string, isCurrent: boolean): ReactNode {
     const nodes: ReactNode[] = [];
 
@@ -344,7 +357,7 @@ export default function PracticeBoard({
             key={`s-${index}`}
             className={`char char--skipped${passed ? '' : ' char--hidden'}`}
           >
-            {char.char}
+            {displayTypingChar(char.char)}
           </span>,
         );
         return;
@@ -355,7 +368,7 @@ export default function PracticeBoard({
         const actual = typedText[targetIndex];
         nodes.push(
           <span key={`c-${index}`} className={`char ${actual === char.char ? 'char--ok' : 'char--bad'}`}>
-            {actual}
+            {displayTypingChar(actual)}
           </span>,
         );
         return;
@@ -367,7 +380,7 @@ export default function PracticeBoard({
       // 未输入的位置用隐藏字符占位，保证原文和手写行逐字符一一对应
       nodes.push(
         <span key={`p-${index}`} className="char char--hidden">
-          {char.char}
+          {displayTypingChar(char.char)}
         </span>,
       );
     });
@@ -518,11 +531,8 @@ export default function PracticeBoard({
               return (
                 <div
                   className="article-row article-row--blank"
+                  data-line-index={line.index}
                   key={line.index}
-                  ref={(element) => {
-                    if (element) rowRefs.current.set(line.index, element);
-                    else rowRefs.current.delete(line.index);
-                  }}
                 />
               );
             }
@@ -532,16 +542,23 @@ export default function PracticeBoard({
             const typedText = isDone ? state!.typed : isCurrent ? typed : '';
             return (
               <div
-                ref={(element) => {
-                  if (element) rowRefs.current.set(line.index, element);
-                  else rowRefs.current.delete(line.index);
-                }}
                 className={`article-row${isCurrent ? ' article-row--current' : ''}${
                   isDone ? ' article-row--done' : ''
                 }`}
+                data-line-index={line.index}
                 key={line.index}
               >
-                <div className="source-line">{line.tokens.map((token, index) => renderSourceToken(token, `${line.index}-${index}`))}</div>
+                <div className="source-line">
+                  {line.tokens.map((token, index) => renderSourceToken(token, `${line.index}-${index}`))}
+                  {line.needsEnter ? (
+                    <span
+                      className={`newline-marker${skipSettings.newline ? ' newline-marker--skipped' : ''}`}
+                      aria-hidden="true"
+                    >
+                      ↵
+                    </span>
+                  ) : null}
+                </div>
                 {isCurrent || isDone ? (
                   renderTypedLine(line, typedText, isCurrent)
                 ) : (

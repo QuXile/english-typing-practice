@@ -17,6 +17,10 @@ export interface ArticleLine {
   /** 行文本（不含换行） */
   text: string;
   tokens: ArticleToken[];
+  /** 是否为原始段落的最后一行（长行拆成多行时只有最后一行是 true） */
+  paragraphEnd: boolean;
+  /** 段落末尾是否需要按 Enter */
+  needsEnter: boolean;
 }
 
 export interface ParsedArticle {
@@ -59,13 +63,88 @@ export function normalizeArticleText(raw: string): string {
     .replace(/’/g, "'");
 }
 
+/** 中文/排版标点 -> 英文半角标点 */
+const PUNCTUATION_MAP: Record<string, string> = {
+  '，': ',',
+  '。': '.',
+  '、': ',',
+  '；': ';',
+  '：': ':',
+  '？': '?',
+  '！': '!',
+  '（': '(',
+  '）': ')',
+  '【': '[',
+  '】': ']',
+  '《': '<',
+  '》': '>',
+  '「': '"',
+  '」': '"',
+  '『': "'",
+  '』': "'",
+  '“': '"',
+  '”': '"',
+  '‘': "'",
+  '’': "'",
+  '—': '-',
+  '–': '-',
+  '―': '-',
+  '…': '...',
+  '～': '~',
+  '〜': '~',
+  '　': ' ',
+  '·': '.',
+  '•': '.',
+  '×': 'x',
+  '÷': '/',
+};
+
+/**
+ * 输入文本预处理：
+ * 1. 中文/全角标点尽量转换为英文半角；
+ * 2. 把键盘无法直接输入的字符（中文、emoji、特殊符号等）统一替换为空格；
+ * 3. 换行符保留，缩进 Tab 转成 4 个空格。
+ * 这样原文里的每个视觉字符都能在英文键盘上打出来，且不会导致手写行错位。
+ */
+export function preprocessArticleText(raw: string): string {
+  const normalized = normalizeArticleText(raw);
+  let result = '';
+  for (const char of normalized) {
+    if (char === '\n') {
+      result += '\n';
+      continue;
+    }
+    const mapped = PUNCTUATION_MAP[char];
+    if (mapped !== undefined) {
+      result += mapped;
+      continue;
+    }
+    const code = char.codePointAt(0) ?? 0;
+    if (code >= 0xff01 && code <= 0xff5e) {
+      result += String.fromCharCode(code - 0xfee0);
+      continue;
+    }
+    if (char === '\t') {
+      result += '    ';
+      continue;
+    }
+    if (code >= 0x20 && code <= 0x7e) {
+      result += char;
+      continue;
+    }
+    // 无法用英文键盘直接输入的字符（中文、emoji 等）用空格占位
+    result += ' ';
+  }
+  return result;
+}
+
 /**
  * 把文章解析成「行 -> token」结构。空行保留；首尾空行去掉。
  * 行内空格、标点、缩进都原样保留，用于逐行对照输入。
  * 由于原文行和手写行需要单行对齐，过长的原始行会按 token 边界再切成多行。
  */
 export function parseArticle(raw: string, maxChars = DEFAULT_MAX_LINE_CHARS): ParsedArticle {
-  const normalized = normalizeArticleText(raw);
+  const normalized = preprocessArticleText(raw);
   const rawLines = normalized.split('\n');
   let start = 0;
   let end = rawLines.length;
@@ -115,6 +194,8 @@ export function parseArticle(raw: string, maxChars = DEFAULT_MAX_LINE_CHARS): Pa
   for (let i = start; i < end; i += 1) {
     const lineText = rawLines[i];
     charCount += lineText.length;
+    // 段末 ↵ 也占一个字符位置
+    if (lineText.trim() !== '') charCount += 1;
 
     const lineTokens: ArticleToken[] = [];
     let last = 0;
@@ -138,34 +219,43 @@ export function parseArticle(raw: string, maxChars = DEFAULT_MAX_LINE_CHARS): Pa
     }
 
     if (lineTokens.length === 0) {
-      lines.push({ index: lines.length, text: '', tokens: [] });
+      lines.push({ index: lines.length, text: '', tokens: [], paragraphEnd: false, needsEnter: false });
       continue;
     }
 
-    for (const rowTokens of splitRowTokens(lineTokens)) {
+    const rows = splitRowTokens(lineTokens);
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+      const rowTokens = rows[rowIndex];
       const rowText = rowTokens.map(tokenText).join('');
-      lines.push({ index: lines.length, text: rowText, tokens: rowTokens });
+      const paragraphEnd = rowIndex === rows.length - 1 && lineText.trim() !== '';
+      lines.push({
+        index: lines.length,
+        text: rowText,
+        tokens: rowTokens,
+        paragraphEnd,
+        needsEnter: paragraphEnd,
+      });
     }
   }
 
   return { lines, words, charCount };
 }
 
-/** 字符分类，用于四个跳过设置的判定 */
-export type CharCategory = 'letter' | 'space' | 'punct' | 'digit' | 'other';
+/** 字符分类，用于跳过设置的判定 */
+export type CharCategory = 'letter' | 'space' | 'punct' | 'digit' | 'other' | 'newline';
 
 export interface SkipSettings {
   space: boolean;
   punct: boolean;
   digit: boolean;
-  other: boolean;
+  newline: boolean;
 }
 
 export const DEFAULT_SKIP_SETTINGS: SkipSettings = {
   space: false,
   punct: false,
   digit: false,
-  other: false,
+  newline: false,
 };
 
 const SPACE_RE = /^\s$/;
@@ -177,6 +267,7 @@ function isAsciiPunct(code: number): boolean {
 }
 
 export function classifyChar(char: string): CharCategory {
+  if (char === '\n') return 'newline';
   const code = char.codePointAt(0) ?? 0;
   if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122)) return 'letter';
   if (SPACE_RE.test(char)) return 'space';
@@ -186,7 +277,7 @@ export function classifyChar(char: string): CharCategory {
 }
 
 export function shouldSkipCategory(category: CharCategory, skip: SkipSettings): boolean {
-  if (category === 'letter') return false;
+  if (category === 'letter' || category === 'other') return false;
   return skip[category];
 }
 
@@ -217,6 +308,8 @@ export interface TypingLine {
   chars: TypingChar[];
   targets: TypingTarget[];
   skippedCount: number;
+  /** 段末是否需要换行：显示 ↵，并可能要求按 Enter */
+  needsEnter: boolean;
 }
 
 export interface TypingModel {
@@ -263,6 +356,11 @@ export function buildTypingModel(article: ParsedArticle, skip: SkipSettings): Ty
       }
     }
 
+    // 段末换行作为额外的字符：未跳过时要求按 Enter，跳过时自动完成
+    if (line.needsEnter) {
+      pushChar('\n', null);
+    }
+
     // 计算每个 target 对应的“当前词”：优先向前找同行的词，行内没有前词再向后找
     for (let t = 0; t < targets.length; t += 1) {
       const position = targetPositions[t];
@@ -291,6 +389,7 @@ export function buildTypingModel(article: ParsedArticle, skip: SkipSettings): Ty
       chars,
       targets,
       skippedCount: chars.length - targets.length,
+      needsEnter: line.needsEnter,
     });
     totalTargets += targets.length;
   }

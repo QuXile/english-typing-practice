@@ -71,8 +71,8 @@ export default function Index() {
   return (
     <div className={`page-shell${stage === 'practice' ? ' page-shell--practice' : ''}`}>
       <header className="page-header">
-        <div className="page-header__eyebrow">Read · Type · Learn</div>
         <h1 className="page-header__title">English Typing Practice</h1>
+        <div className="page-header__eyebrow">Read · Type · Learn</div>
       </header>
 
       {stage === 'import' ? (
@@ -96,7 +96,7 @@ export default function Index() {
               <span className="feature-list__icon">02</span>
               <div>
                 <strong>逐行对照</strong>
-                <p>原文在上、手写在下，逐字符对齐；空格和标点默认也要打，可按需跳过。</p>
+                <p>原文在上、手写在下，逐字符对齐；空格、标点和段末换行默认也要自己输入。</p>
               </div>
             </li>
             <li>

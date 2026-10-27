@@ -85,20 +85,26 @@ input:focus-visible,
 /* ---------- header ---------- */
 
 .page-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px 24px;
+  flex-wrap: wrap;
   margin-bottom: 30px;
 }
 
 .page-header__eyebrow {
-  margin-bottom: 10px;
+  margin: 0;
   color: var(--brand);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.16em;
+  white-space: nowrap;
   text-transform: uppercase;
 }
 
 .page-header__title {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 40px;
   line-height: 1.15;
   letter-spacing: -0.02em;
@@ -1376,4 +1382,14 @@ input:focus-visible,
   .article-row--blank {
     padding-left: 12px;
   }
+}
+
+.newline-marker {
+  color: var(--brand);
+  opacity: 0.55;
+}
+
+.newline-marker--skipped {
+  color: var(--muted);
+  opacity: 0.35;
 }

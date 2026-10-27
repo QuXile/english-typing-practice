@@ -189,7 +189,7 @@ export default function ImportPanel({
       <div className="settings-inline">
         <div className="settings-inline__head">
           <strong>练习设置</strong>
-          <span>默认全部关闭：空格、标点、数字和其他字符都需要按原文打出；换行由逐行推进自动处理。</span>
+          <span>默认全部关闭：空格、标点、数字和换行符都需要自己输入。中文标点会自动转成半角，无法输入的字符会替换为空格。</span>
         </div>
         <PracticeSettings value={skipSettings} onChange={onSkipSettingsChange} />
       </div>
