@@ -36,18 +36,55 @@ export const MAX_ARTICLE_CHARS = 500000;
 const WORD_RE = /[A-Za-z]+(?:['\-][A-Za-z]+)*/g;
 const DEFAULT_MAX_LINE_CHARS = 74;
 
+const MONO_FONT_FAMILY = 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
+let monoCharWidthCache: { fontSize: number; width: number } | null = null;
+
+/** 直接测量当前等宽字体的单字符宽度，避免使用固定估值导致每行浪费空间 */
+function measureMonoCharWidth(fontSize: number): number {
+  if (monoCharWidthCache && monoCharWidthCache.fontSize === fontSize) {
+    return monoCharWidthCache.width;
+  }
+  if (typeof document === 'undefined') {
+    return fontSize * 0.55;
+  }
+
+  const sample = document.createElement('span');
+  sample.textContent = 'M'.repeat(100);
+  sample.style.position = 'absolute';
+  sample.style.visibility = 'hidden';
+  sample.style.whiteSpace = 'pre';
+  sample.style.fontFamily = MONO_FONT_FAMILY;
+  sample.style.fontSize = `${fontSize}px`;
+  sample.style.letterSpacing = '0';
+  document.body.appendChild(sample);
+  const width = sample.getBoundingClientRect().width / 100;
+  sample.remove();
+
+  const result = width > 0 ? width : fontSize * 0.55;
+  monoCharWidthCache = { fontSize, width: result };
+  return result;
+}
+
 /**
- * 根据当前窗口宽度估算“一行最多能放多少个等宽字符”。
- * 原文行和手写行必须保持单行不折行，字符才能一一对齐。
+ * 根据当前窗口宽度计算“一行最多能放多少个等宽字符”。
+ * 原文行和输入框使用同一套字体和左右留白，所以按实际可用宽度和实际字符宽度计算；
+ * 再预留 3 个字符给行尾标点/空格，以及浏览器取整误差。
  */
 export function getArticleMaxChars(viewportWidth = typeof window === 'undefined' ? 1024 : window.innerWidth): number {
-  const pagePadding = viewportWidth <= 780 ? 32 : 48;
-  const panelPadding = viewportWidth <= 780 ? 44 : 64;
-  // 每行左侧要为当前行竖线/缩进预留空位
-  const rowPadding = viewportWidth <= 780 ? 12 : 16;
-  const content = Math.min(viewportWidth, 980) - pagePadding - panelPadding - rowPadding;
-  // 18px 等宽字体单字符约 10.8px；额外留出几个字符给行尾空格/标点
-  return Math.max(20, Math.min(74, Math.floor((content - 40) / 10.8)));
+  const mobile = viewportWidth <= 780;
+  const pagePadding = mobile ? 32 : 48;
+  const panelPadding = mobile ? 24 : 48;
+  const rowPadding = mobile ? 12 : 16;
+  // 原文行/输入框左右 padding + 边框
+  const inlinePadding = mobile ? 18 : 22;
+  // 滚动条 8px + 右侧留白 6px
+  const scrollbarReserve = 14;
+  const pageWidth = Math.min(viewportWidth, 980);
+  const available = pageWidth - pagePadding - panelPadding - rowPadding - inlinePadding - scrollbarReserve;
+  const fontSize = mobile ? 16 : 18;
+  const charWidth = measureMonoCharWidth(fontSize);
+
+  return Math.max(20, Math.floor(available / charWidth) - 3);
 }
 
 export function normalizeApostrophes(text: string): string {
