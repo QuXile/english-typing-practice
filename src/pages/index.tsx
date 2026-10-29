@@ -51,10 +51,6 @@ export default function Index() {
     setSessionKey((key) => key + 1);
   }
 
-  function restartPractice() {
-    setSessionKey((key) => key + 1);
-  }
-
   function exitToImport() {
     setStage('import');
   }
@@ -69,7 +65,6 @@ export default function Index() {
         coverage={article.coverage}
         skipSettings={skipSettings}
         onApplySettings={handleApplySettings}
-        onRestart={restartPractice}
         onExit={exitToImport}
       />
     );

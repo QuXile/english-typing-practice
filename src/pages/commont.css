@@ -3051,3 +3051,225 @@ body {
   color: #8b95a8;
   font-size: 9.5px;
 }
+
+/* ============================================================
+   本轮反馈：选中词、完成卡、覆盖提示、未应用设置
+   ============================================================ */
+
+/* 选中词用更强的外圈，避免被红色错误块盖住 */
+.word--current,
+.word--pinned {
+  position: relative;
+  z-index: 2;
+  border-radius: 6px;
+  background: #e9eeff;
+  box-shadow:
+    0 0 0 2px #4f6ef7,
+    0 0 0 5px rgba(79, 110, 247, 0.16);
+}
+
+/* 完成时：沿用普通信息卡结构，整卡变绿色渐变 */
+.sidebar-card--completed {
+  border-color: #cbeed9;
+  background:
+    radial-gradient(130% 150% at 0% 0%, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0) 62%),
+    linear-gradient(145deg, #f6fdf9 0%, #e9f8ef 100%);
+  box-shadow: 0 12px 26px rgba(21, 128, 61, 0.08);
+}
+
+.sidebar-card--completed .sidebar-card__eyebrow {
+  color: #2f7d51;
+}
+
+.sidebar-card--completed .status-pill--done {
+  background: #15803d;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(21, 128, 61, 0.22);
+}
+
+.sidebar-card--completed .sidebar-progress__head {
+  color: #4d7c5b;
+}
+
+.sidebar-card--completed .sidebar-progress__head strong {
+  color: #166534;
+}
+
+.sidebar-card--completed .progress {
+  background: rgba(22, 101, 52, 0.13);
+}
+
+.sidebar-card--completed .progress__bar {
+  background: linear-gradient(90deg, #15803d 0%, #34d399 100%);
+}
+
+.sidebar-card--completed .sidebar-stat {
+  border-color: #d8f0e2;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.sidebar-card--completed .sidebar-stat span,
+.sidebar-card--completed .sidebar-stat em {
+  color: #6b8f76;
+}
+
+.sidebar-card--completed .sidebar-stat strong {
+  color: #166534;
+}
+
+/* 词库覆盖悬浮提示 */
+.coverage-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.coverage-wrap .coverage-chip {
+  margin-left: 0;
+  cursor: help;
+}
+
+.coverage-wrap .coverage-tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 80;
+  width: min(300px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid #e1e7f1;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 18px 40px rgba(23, 32, 64, 0.16);
+}
+
+.coverage-tip__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eef1f7;
+}
+
+.coverage-tip__head strong {
+  color: #344054;
+  font-size: 12px;
+}
+
+.coverage-tip__head span {
+  color: #98a2b3;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.coverage-tip__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 10px;
+  max-height: 170px;
+  margin-top: 8px;
+  overflow-y: auto;
+}
+
+.coverage-tip__list span {
+  overflow: hidden;
+  color: #475467;
+  font-size: 11px;
+  line-height: 1.55;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coverage-tip__empty,
+.coverage-tip__more {
+  margin: 8px 0 0;
+  color: #98a2b3;
+  font-size: 10.5px;
+  line-height: 1.55;
+}
+
+/* 修改了设置但尚未应用 */
+.sidebar-card__title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-dirty-pill {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fff4e5;
+  color: #b45309;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* 保证起始页/打字页标题处于完全相同的位置 */
+.app-main--practice {
+  padding-top: 26px;
+}
+
+@media (max-width: 1180px) {
+  .app-main--practice {
+    padding-top: 22px;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-main--practice {
+    padding-top: 18px;
+  }
+}
+
+/* 完成卡绿色渐变的最终优先级（覆盖普通白卡） */
+.app-sidebar .sidebar-card.sidebar-card--completed {
+  border-color: #cbeed9;
+  background:
+    radial-gradient(130% 150% at 0% 0%, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0) 62%),
+    linear-gradient(145deg, #f6fdf9 0%, #e9f8ef 100%);
+  box-shadow: 0 12px 26px rgba(21, 128, 61, 0.08);
+}
+
+.app-sidebar .sidebar-card--completed .sidebar-card__eyebrow {
+  color: #2f7d51;
+}
+
+.app-sidebar .sidebar-card--completed .status-pill--done {
+  background: #15803d;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(21, 128, 61, 0.22);
+}
+
+.app-sidebar .sidebar-card--completed .sidebar-progress__head {
+  color: #4d7c5b;
+}
+
+.app-sidebar .sidebar-card--completed .sidebar-progress__head strong {
+  color: #166534;
+}
+
+.app-sidebar .sidebar-card--completed .progress {
+  background: rgba(22, 101, 52, 0.13);
+}
+
+.app-sidebar .sidebar-card--completed .progress__bar {
+  background: linear-gradient(90deg, #15803d 0%, #34d399 100%);
+}
+
+.app-sidebar .sidebar-card--completed .sidebar-stat {
+  border-color: #d8f0e2;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.app-sidebar .sidebar-card--completed .sidebar-stat span,
+.app-sidebar .sidebar-card--completed .sidebar-stat em {
+  color: #6b8f76;
+}
+
+.app-sidebar .sidebar-card--completed .sidebar-stat strong {
+  color: #166534;
+}

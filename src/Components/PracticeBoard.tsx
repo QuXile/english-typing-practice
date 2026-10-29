@@ -42,9 +42,7 @@ interface LineState {
   done: boolean;
 }
 
-interface CompletionInfo extends SessionSummary {
-  finishedAt: number;
-}
+type CompletionInfo = SessionSummary;
 
 export interface PracticeBoardProps {
   article: ParsedArticle;
@@ -53,7 +51,6 @@ export interface PracticeBoardProps {
   coverage: Coverage;
   skipSettings: SkipSettings;
   onApplySettings: (next: SkipSettings) => void;
-  onRestart: () => void;
   onExit: () => void;
 }
 
@@ -130,15 +127,6 @@ function displaySourceChar(char: string): string {
   return char === '\n' ? '↵' : char;
 }
 
-function formatClock(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString('zh-CN', {
-    hour12: false,
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-}
-
 export default function PracticeBoard({
   article,
   dictionary,
@@ -146,7 +134,6 @@ export default function PracticeBoard({
   coverage,
   skipSettings,
   onApplySettings,
-  onRestart,
   onExit,
 }: PracticeBoardProps) {
   const model = useMemo(() => buildTypingModel(article, skipSettings), [article, skipSettings]);
@@ -168,6 +155,7 @@ export default function PracticeBoard({
   const [draftSettings, setDraftSettings] = useState<SkipSettings>(skipSettings);
   const [autoAnchor, setAutoAnchor] = useState<HTMLElement | null>(null);
   const [completion, setCompletion] = useState<CompletionInfo | null>(null);
+  const [coverageOpen, setCoverageOpen] = useState(false);
 
   const lineInputRef = useRef<HTMLInputElement>(null);
   const pendingSelectionRef = useRef<number | null>(null);
@@ -211,6 +199,23 @@ export default function PracticeBoard({
     });
     return count;
   }, [wordLastCells, lineStates]);
+
+  const uncoveredWords = useMemo(() => {
+    const seen = new Set<string>();
+    const missing: Array<{ key: string; text: string }> = [];
+    for (const word of model.words) {
+      if (seen.has(word.key)) continue;
+      seen.add(word.key);
+      if (!lookupWord(dictionary, word.key)) {
+        missing.push({ key: word.key, text: word.text });
+      }
+    }
+    return missing.sort((a, b) => a.key.localeCompare(b.key));
+  }, [model, dictionary]);
+
+  const settingsDirty = (
+    Object.keys(skipSettings) as Array<keyof SkipSettings>
+  ).some((key) => draftSettings[key] !== skipSettings[key]);
 
   useLayoutEffect(() => {
     const input = lineInputRef.current;
@@ -295,7 +300,7 @@ export default function PracticeBoard({
     const end = Date.now();
     const start = startTimeRef.current ?? end;
     const summary = aggregateSummary(model, finalStates, Math.max(0, end - start));
-    const info: CompletionInfo = { ...summary, finishedAt: end };
+    const info: CompletionInfo = summary;
     completionRef.current = info;
     setCompletion(info);
     setNow(end);
@@ -697,12 +702,48 @@ export default function PracticeBoard({
                 <span className="skip-chip">跳过 {model.skippedChars} 字符</span>
               ) : null}
             </div>
-            <span
-              className="coverage-chip"
-              title={`不重复单词中，有 ${coverage.covered} 个可在词库查到`}
+            <div
+              className="coverage-wrap"
+              onMouseEnter={() => setCoverageOpen(true)}
+              onMouseLeave={() => setCoverageOpen(false)}
+              onFocus={() => setCoverageOpen(true)}
+              onBlur={() => setCoverageOpen(false)}
             >
-              词库覆盖 {Math.round(coverage.ratio * 100)}%
-            </span>
+              <span
+                className="coverage-chip"
+                tabIndex={0}
+                role="status"
+                aria-label={`词库覆盖 ${Math.round(coverage.ratio * 100)}%`}
+              >
+                词库覆盖 {Math.round(coverage.ratio * 100)}%
+              </span>
+              {coverageOpen ? (
+                <div className="coverage-tip" role="tooltip">
+                  <div className="coverage-tip__head">
+                    <strong>未覆盖单词</strong>
+                    <span>
+                      {uncoveredWords.length} / {coverage.total}
+                    </span>
+                  </div>
+                  {uncoveredWords.length === 0 ? (
+                    <p className="coverage-tip__empty">文章里的单词都已在词库中。</p>
+                  ) : (
+                    <>
+                      <div className="coverage-tip__list">
+                        {uncoveredWords.slice(0, 80).map((word) => (
+                          <span key={word.key}>{word.text}</span>
+                        ))}
+                      </div>
+                      {uncoveredWords.length > 80 ? (
+                        <p className="coverage-tip__more">
+                          还有 {uncoveredWords.length - 80} 个未显示
+                        </p>
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </div>
           </div>
 
           <div className="panel article-panel">
@@ -842,17 +883,14 @@ export default function PracticeBoard({
               <strong>{displayStats.errors}</strong>
             </div>
           </div>
-
-          {completion ? (
-            <div className="sidebar-completion-time">
-              完成于 {formatClock(completion.finishedAt)}
-            </div>
-          ) : null}
         </section>
 
         <section className="sidebar-card">
           <div className="sidebar-card__head">
-            <h2 className="sidebar-card__title">练习设置</h2>
+            <div className="sidebar-card__title-wrap">
+              <h2 className="sidebar-card__title">练习设置</h2>
+              {settingsDirty ? <span className="settings-dirty-pill">未应用</span> : null}
+            </div>
             <span className="sidebar-card__eyebrow">SETTINGS</span>
           </div>
           <p className="sidebar-hint">修改后将从文章开头重新计时。</p>
