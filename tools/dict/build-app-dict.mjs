@@ -10,8 +10,9 @@
  *   - alias    : { l, p? }  -- an inflected form that resolves to a headword
  *
  * Headwords: single English words with an exam tag, positive frequency,
- * Collins 3+, Oxford 3000, or single-letter words. Aliases cover inflected
- * forms (wrapped -> wrap, went -> go, ...) so articles rarely show "未收录".
+ * Collins 3+, Oxford 3000, single-letter words, or a reasonably common BNC
+ * rank. Aliases cover inflected forms (wrapped -> wrap, went -> go, ...) so
+ * articles rarely show "未收录".
  *
  * Requirements: Node.js >= 22.5 (built-in node:sqlite), no npm dependencies.
  */
@@ -130,6 +131,8 @@ const headRows = db.prepare(`
       OR collins >= 3
       OR oxford = 1
       OR length(word) = 1
+      -- 补上只在 BNC 中有排名、但缺 FRQ/标签的常见词（如 an）
+      OR (bnc > 0 AND bnc <= 10000)
     )
 `).all();
 

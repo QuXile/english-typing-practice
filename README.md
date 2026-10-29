@@ -12,7 +12,8 @@
 - 输入框里也会显示 `↵`；Enter 和普通字符一样作为输入处理，多按 Enter 会被当作错误字符，而不是跳到下一行；
 - 导入时会先预处理：中文/全角标点转英文半角，键盘无法输入的字符（中文、emoji 等）统一替换为空格；
 - 每段末尾显示 `↵`；空格 / 标点 / 数字 / 换行符可配置跳过，**默认全部关闭**；标记为跳过的字符会自动填入输入框（包括 `↵`），退格遇到自动跳过的字符时会连带退掉前面一个正常字符；
-- 词库来自 ECDICT / ecdict-revised 的本地合并数据，按需加载约 2.1MB（gzip）的 Web 子集，支持变位词回退到原形；
+- 词库来自 ECDICT / ecdict-revised 的本地合并数据，按需加载约 2.1MB（gzip）的 Web 子集，支持变位词回退到原形；并补充了 BNC 排名前 10000 的常见词，减少 an 这类常见词漏收；
+- 连字符复合词（algorithm-driven / cross-check）会拆成各组成部分判断收录和查词；
 - WPM 采用净 WPM 口径：`正确字符数 / 5 / 用时（分钟）`，错误字符不计入；正确率单独计算；
 - 释义按词性逐行展示；卡片显示词形变化（过去式、过去分词、复数、比较级等）；悬浮卡在单词上方时，字段顺序自动反转，让“释义”始终离输入位置最近；
 - 起始页和打字页统一为左右栏：左侧导入文章或主打字，右侧固定浅色窄侧边栏放设置、打字信息、快捷键和词库来源；
@@ -44,7 +45,7 @@ cd tools/dict
 bash fetch-data.sh     # 首次下载 ECDICT + ecdict-revised 原始数据（约 110MB）
 node build.mjs         # 生成 data/dict.sqlite（约 73MB）
 cd ../..
-pnpm dict:app          # 生成 src/data/generated/dictionary.json（约 5.6MB / gzip 1.8MB）
+pnpm dict:app          # 生成 src/data/generated/dictionary.json（约 6.8MB / gzip 2.1MB）
 ```
 
 - `tools/dict/dict.mjs` 是命令行查词工具（精确查词/中文反查/随机词/统计）；

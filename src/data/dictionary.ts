@@ -72,8 +72,7 @@ function isAlias(node: DictionaryNode): node is DictionaryAlias {
  * 查询单词。变形词（wrapped / went / was ...）会自动回退到原形词条，
  * 音标仍使用变形词自己的音标。
  */
-export function lookupWord(dictionary: Dictionary, word: string): DictionaryEntry | undefined {
-  const key = word.toLowerCase().replace(/’/g, "'");
+function lookupSingleWord(dictionary: Dictionary, key: string): DictionaryEntry | undefined {
   const node = dictionary[key];
   if (!node) return undefined;
   if (!isAlias(node)) return node;
@@ -81,4 +80,42 @@ export function lookupWord(dictionary: Dictionary, word: string): DictionaryEntr
   const base = dictionary[node.l];
   if (!base || isAlias(base)) return undefined;
   return { ...base, p: node.p || base.p, lemma: node.l };
+}
+
+function lookupCompoundWord(dictionary: Dictionary, key: string): DictionaryEntry | undefined {
+  if (!key.includes('-')) return undefined;
+  const parts = key.split('-').filter(Boolean);
+  if (parts.length < 2) return undefined;
+
+  const entries: DictionaryEntry[] = [];
+  for (const part of parts) {
+    const entry = lookupSingleWord(dictionary, part);
+    if (!entry) return undefined;
+    entries.push(entry);
+  }
+
+  type Tag = (typeof TAG_ORDER)[number];
+  const tags = [...new Set(entries.flatMap((entry) => entry.tags ?? []))].sort(
+    (a, b) => TAG_ORDER.indexOf(a as Tag) - TAG_ORDER.indexOf(b as Tag),
+  );
+  const translation = parts
+    .map((part, index) => `${part}: ${entries[index].t.replace(/\n/g, ' / ')}`)
+    .join('\n');
+
+  return {
+    t: translation,
+    p: '',
+    ...(tags.length ? { tags } : {}),
+  };
+}
+
+/**
+ * 查询单词。变形词（wrapped / went / was ...）会自动回退到原形词条，
+ * 音标仍使用变形词自己的音标。
+ * 连字符复合词（algorithm-driven / cross-check）会拆成各组成部分，只有全部
+ * 部分都能查到才视为已收录，并把各部分的释义组合展示。
+ */
+export function lookupWord(dictionary: Dictionary, word: string): DictionaryEntry | undefined {
+  const key = word.toLowerCase().replace(/’/g, "'");
+  return lookupSingleWord(dictionary, key) ?? lookupCompoundWord(dictionary, key);
 }

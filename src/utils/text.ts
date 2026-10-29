@@ -472,12 +472,23 @@ export interface Coverage {
   ratio: number;
 }
 
+/**
+ * 连字符复合词按各部分判断收录情况，例如 algorithm-driven 由 algorithm 和 driven 共同覆盖。
+ * 只有全部组成部分都有词条时才视为已覆盖。
+ */
+function hasCoverage(dictionary: Record<string, unknown>, key: string): boolean {
+  if (dictionary[key]) return true;
+  if (!key.includes('-')) return false;
+  const parts = key.split('-').filter(Boolean);
+  return parts.length >= 2 && parts.every((part) => Boolean(dictionary[part]));
+}
+
 /** 文章里「不重复单词」在词典里的覆盖率，用于开始前提示 */
 export function countCoverage(words: WordToken[], dictionary: Record<string, unknown>): Coverage {
   const unique = new Set(words.map((word) => word.key));
   let covered = 0;
   for (const key of unique) {
-    if (dictionary[key]) covered += 1;
+    if (hasCoverage(dictionary, key)) covered += 1;
   }
   return {
     total: unique.size,
