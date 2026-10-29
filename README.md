@@ -6,6 +6,9 @@
 
 > React 18 · TypeScript · Umi 4 · 本地词库 · 无后端
 
+在线演示：<https://quxile.github.io/english-typing-practice/>  
+源码仓库：<https://github.com/QuXile/english-typing-practice>
+
 ## 功能概览
 
 ### 左右栏工作区
@@ -158,6 +161,20 @@ pnpm exec tsc --noEmit
 ```
 
 `pnpm build` 会生成可直接静态部署的 `docs/` 目录；项目没有后端依赖。
+
+### 部署到 GitHub Pages
+
+本项目使用 GitHub Pages 的 `main` 分支 `/docs` 目录作为静态站点：
+
+- 生产构建的 base/publicPath 固定为 `/english-typing-practice/`；
+- 本地开发仍使用根路径 `/`；
+- 更新后执行 `pnpm build`，提交 `docs/` 即可触发 Pages 更新。
+
+仓库的 GitHub Pages 地址为：
+
+```text
+https://quxile.github.io/english-typing-practice/
+```
 
 pnpm 12 默认会拦截依赖构建脚本，本项目在 `pnpm-workspace.yaml` 的 `allowBuilds` 中放行了 `esbuild`、`core-js` 和 `core-js-pure`。
 
