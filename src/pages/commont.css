@@ -2711,3 +2711,262 @@ body {
   border-top-right-radius: 3px;
   border-bottom-right-radius: 3px;
 }
+
+/* ============================================================
+   侧栏改为浅色，去掉左右黑白割裂
+   ============================================================ */
+
+.app-sidebar {
+  color-scheme: light;
+  color: #1d2433;
+  background:
+    radial-gradient(460px 320px at 100% 0%, rgba(109, 124, 255, 0.1), rgba(109, 124, 255, 0) 64%),
+    #eef2fa;
+  border-left: 1px solid #e0e6f1;
+}
+
+.app-sidebar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+.app-sidebar .sidebar-card {
+  padding: 16px;
+  border: 1px solid #e4e9f2;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(23, 32, 64, 0.05);
+}
+
+.app-sidebar .sidebar-card:first-child {
+  padding-top: 16px;
+}
+
+.app-sidebar .sidebar-card + .sidebar-card {
+  border-top: 1px solid #e4e9f2;
+}
+
+.app-sidebar .sidebar-card__head {
+  margin-bottom: 9px;
+}
+
+.app-sidebar .sidebar-card__title {
+  color: #1d2433;
+}
+
+.app-sidebar .sidebar-card__eyebrow {
+  color: #6875d8;
+}
+
+.app-sidebar .sidebar-hint {
+  color: #7a8497;
+}
+
+.app-sidebar .sidebar-help p {
+  color: #667085;
+}
+
+.app-sidebar .sidebar-help__num {
+  color: #6875d8;
+}
+
+.app-sidebar .status-pill {
+  background: #eef1f7;
+  color: #667085;
+}
+
+.app-sidebar .status-pill--running {
+  background: #e9edff;
+  color: #4f5ec7;
+}
+
+.app-sidebar .status-pill--done {
+  background: #e8f8ef;
+  color: #15803d;
+}
+
+.app-sidebar .sidebar-stats {
+  gap: 8px;
+}
+
+.app-sidebar .sidebar-stat {
+  border: 1px solid #edf0f6;
+  border-radius: 12px;
+  background: #f7f9fc;
+}
+
+.app-sidebar .sidebar-stat span {
+  color: #7a8497;
+}
+
+.app-sidebar .sidebar-stat strong {
+  color: #1d2433;
+}
+
+.app-sidebar .sidebar-stat em {
+  color: #98a2b3;
+}
+
+.app-sidebar .sidebar-progress__head {
+  color: #7a8497;
+}
+
+.app-sidebar .sidebar-progress__head strong {
+  color: #475467;
+}
+
+.app-sidebar .progress {
+  background: #e9edf5;
+}
+
+.app-sidebar .progress__bar {
+  background: linear-gradient(90deg, #6d7cff, #9b7cf6);
+}
+
+.app-sidebar .setting-item {
+  padding: 6px 7px;
+}
+
+.app-sidebar .setting-item:hover {
+  background: #f4f6fc;
+}
+
+.app-sidebar .setting-item__label {
+  color: #344054;
+}
+
+.app-sidebar .setting-item__desc {
+  color: #7a8497;
+}
+
+.app-sidebar .setting-item__input {
+  border-color: #cfd7e5;
+  background: #fff;
+}
+
+.app-sidebar .setting-item__input:hover {
+  border-color: #9aa8c7;
+}
+
+.app-sidebar .setting-item__input:checked {
+  border-color: var(--brand);
+  background: var(--brand);
+}
+
+.app-sidebar .button--ghost {
+  border: 1px solid #dfe5f1;
+  background: #fff;
+  color: #344054;
+}
+
+.app-sidebar .button--ghost:hover {
+  border-color: #c7d2e6;
+  background: #f8faff;
+}
+
+.app-sidebar .button--text {
+  color: #667085;
+}
+
+.app-sidebar .button--text:hover {
+  color: #1d2433;
+}
+
+.app-sidebar .sidebar-apply {
+  border: 0;
+  background: linear-gradient(135deg, #6d7cff 0%, #8b5cf6 100%);
+  color: #fff;
+  box-shadow: 0 9px 20px rgba(109, 124, 255, 0.18);
+}
+
+.app-sidebar .completion-card {
+  border: 1px solid #d1f0df;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(21, 128, 61, 0.09), rgba(255, 255, 255, 0) 64%),
+    #f7fdf9;
+}
+
+.app-sidebar .completion-card__title {
+  color: #166534;
+}
+
+.app-sidebar .completion-card__title span {
+  background: #15803d;
+  color: #fff;
+}
+
+.app-sidebar .completion-card__note {
+  color: #4d7c5b;
+}
+
+.app-sidebar .completion-card__grid > div {
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.app-sidebar .completion-card__grid span {
+  color: #6b8f76;
+}
+
+.app-sidebar .completion-card__grid strong {
+  color: #166534;
+}
+
+.app-sidebar .completion-card__foot {
+  color: #6b8f76;
+}
+
+.app-sidebar .completion-card__tip {
+  color: #4d7c5b;
+}
+
+.sidebar-foot {
+  border-top-color: #dde4ef;
+  color: #98a2b3;
+}
+
+/* 进度条放到信息卡顶部 */
+.sidebar-progress--top {
+  margin: 0 0 14px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid #eef1f7;
+}
+
+/* 标题与副标题间距 */
+.brand__copy {
+  gap: 5px;
+}
+
+.page-header--compact .brand__copy {
+  gap: 4px;
+}
+
+.page-header__eyebrow {
+  line-height: 1.45;
+}
+
+/* 新增单词数 chips */
+.word-counter {
+  padding: 5px 10px;
+  border: 1px solid #edf0f6;
+  border-radius: 999px;
+  background: #fff;
+  color: #667085;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.brand__copy {
+  gap: 6px;
+}
+
+.page-header--compact .brand__copy {
+  gap: 5px;
+}
+
+.brand__copy {
+  gap: 8px;
+}
+
+.page-header--compact .brand__copy {
+  gap: 6px;
+}

@@ -192,6 +192,26 @@ export default function PracticeBoard({
     [model, lineStates, elapsedMs],
   );
 
+  const wordLastCells = useMemo(() => {
+    const cells = new Map<number, { lineIndex: number; cell: number }>();
+    model.lines.forEach((line, lineIndex) => {
+      line.chars.forEach((char, cell) => {
+        if (char.wordIndex !== null) {
+          cells.set(char.wordIndex, { lineIndex, cell });
+        }
+      });
+    });
+    return cells;
+  }, [model]);
+
+  const typedWords = useMemo(() => {
+    let count = 0;
+    wordLastCells.forEach(({ lineIndex, cell }) => {
+      if ((lineStates[lineIndex]?.typed.length ?? 0) > cell) count += 1;
+    });
+    return count;
+  }, [wordLastCells, lineStates]);
+
   useLayoutEffect(() => {
     const input = lineInputRef.current;
     if (!input || !currentLine) return;
@@ -466,6 +486,40 @@ export default function PracticeBoard({
       return;
     }
 
+    if (
+      event.key === 'ArrowLeft' &&
+      !event.shiftKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      start === 0 &&
+      end === 0
+    ) {
+      const target = findPreviousLineWithTargets(model, lineIndex - 1);
+      if (target >= 0) {
+        event.preventDefault();
+        activateLine(target);
+      }
+      return;
+    }
+
+    if (
+      event.key === 'ArrowRight' &&
+      !event.shiftKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      start === typed.length &&
+      end === typed.length
+    ) {
+      const target = findNextLineWithTargets(model, lineIndex + 1);
+      if (target >= 0) {
+        event.preventDefault();
+        activateLine(target, 0);
+      }
+      return;
+    }
+
     if (event.key === 'Enter') {
       event.preventDefault();
       if (skipSettings.newline) return;
@@ -629,6 +683,9 @@ export default function PracticeBoard({
               <span className="line-counter">
                 第 {lineIndex + 1} / {model.lines.length} 行
               </span>
+              <span className="word-counter" title="已输入单词 / 总单词">
+                {typedWords.toLocaleString()} / {model.words.length.toLocaleString()} 单词
+              </span>
               <span className="char-counter">
                 {stats.typedChars} / {model.totalTargets} 字符
               </span>
@@ -738,12 +795,24 @@ export default function PracticeBoard({
       <aside className="app-sidebar app-sidebar--practice">
         <section className={`sidebar-card sidebar-card--status${completion ? ' sidebar-card--completed' : ''}`}>
           <div className="sidebar-status-head">
-            <span className="sidebar-card__eyebrow">TYPING</span>
             <span
               className={`status-pill${completion ? ' status-pill--done' : status === 'running' ? ' status-pill--running' : ''}`}
             >
               {completion ? '已完成' : status === 'running' ? '计时中' : '准备中'}
             </span>
+            <span className="sidebar-card__eyebrow">TYPING</span>
+          </div>
+
+          <div className="sidebar-progress sidebar-progress--top">
+            <div className="sidebar-progress__head">
+              <span>{completion ? '当前进度' : '进度'}</span>
+              <strong>
+                {stats.typedChars} / {model.totalTargets}
+              </strong>
+            </div>
+            <div className="progress progress--inline">
+              <div className="progress__bar" style={{ width: `${Math.min(100, progress)}%` }} />
+            </div>
           </div>
 
           {completion ? (
@@ -804,18 +873,6 @@ export default function PracticeBoard({
               </div>
             </div>
           )}
-
-          <div className="sidebar-progress">
-            <div className="sidebar-progress__head">
-              <span>{completion ? '当前进度' : '进度'}</span>
-              <strong>
-                {stats.typedChars} / {model.totalTargets}
-              </strong>
-            </div>
-            <div className="progress progress--inline">
-              <div className="progress__bar" style={{ width: `${Math.min(100, progress)}%` }} />
-            </div>
-          </div>
         </section>
 
         <section className="sidebar-card">
@@ -835,10 +892,7 @@ export default function PracticeBoard({
         </section>
 
         <section className="sidebar-card sidebar-card--actions">
-          <button type="button" className="button button--ghost" onClick={onRestart}>
-            重新开始
-          </button>
-          <button type="button" className="button button--text" onClick={onExit}>
+          <button type="button" className="button button--ghost" onClick={onExit}>
             换一篇文章
           </button>
         </section>
