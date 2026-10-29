@@ -82,7 +82,14 @@ export function getArticleMaxChars(viewportWidth = typeof window === 'undefined'
 
   const mainElement =
     typeof document === 'undefined' ? null : document.querySelector<HTMLElement>('.app-main');
-  const measuredMainWidth = mainElement?.getBoundingClientRect().width ?? 0;
+  let measuredMainWidth = 0;
+  if (mainElement) {
+    const style = window.getComputedStyle(mainElement);
+    measuredMainWidth =
+      mainElement.clientWidth -
+      parseFloat(style.paddingLeft || '0') -
+      parseFloat(style.paddingRight || '0');
+  }
   const mainWidth =
     measuredMainWidth > 240 ? measuredMainWidth : Math.min(viewportWidth, 980) - pagePadding;
 

@@ -517,15 +517,26 @@ export default function PracticeBoard({
     normalizeInput(raw, start + 1, end >= typed.length);
   }
 
+  function isErrorSourceChar(line: TypingLine, state: LineState, index: number): boolean {
+    const char = line.chars[index];
+    if (!char || char.skipped) return false;
+    const value = state.typed[index];
+    return value !== undefined && value !== displaySourceChar(char.char);
+  }
+
   function sourceCharClass(line: TypingLine, state: LineState, index: number): string {
     const char = line.chars[index];
     if (char.skipped) return 'source-char source-char--skipped';
 
     const value = state.typed[index];
     if (value === undefined) return 'source-char';
-    return value === displaySourceChar(char.char)
-      ? 'source-char source-char--ok'
-      : 'source-char source-char--bad';
+    if (value === displaySourceChar(char.char)) return 'source-char source-char--ok';
+
+    const previousError = isErrorSourceChar(line, state, index - 1);
+    const nextError = isErrorSourceChar(line, state, index + 1);
+    return `source-char source-char--bad${previousError ? '' : ' source-char--bad-first'}${
+      nextError ? '' : ' source-char--bad-last'
+    }`;
   }
 
   function renderSourceChar(line: TypingLine, state: LineState, index: number): ReactNode {
@@ -831,6 +842,12 @@ export default function PracticeBoard({
             换一篇文章
           </button>
         </section>
+
+        <div className="sidebar-foot">
+          <span>↑ / ↓ 切换行</span>
+          <span>Enter 输入 ↵</span>
+          <span>⌫ 退格</span>
+        </div>
       </aside>
 
       <WordTip

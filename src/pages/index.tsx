@@ -120,6 +120,12 @@ export default function Index() {
             </li>
           </ul>
         </section>
+
+        <div className="sidebar-foot">
+          <span>↑ / ↓ 切换行</span>
+          <span>Enter 输入 ↵</span>
+          <span>⌫ 退格</span>
+        </div>
       </aside>
     </div>
   );
