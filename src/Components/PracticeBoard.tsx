@@ -20,16 +20,9 @@ import AppHeader from './AppHeader';
 import PracticeSettings from './PracticeSettings';
 import WordTip from './WordTip';
 
-export interface SessionSummary {
-  /** 源文本字符数（不含换行） */
-  totalChars: number;
-  /** 需要输入的字符数（排除按设置跳过的字符） */
-  requiredChars: number;
-  /** 按设置自动跳过的字符数 */
-  skippedChars: number;
+interface SessionSummary {
   /** 已输入的需要输入字符数（含打错的） */
   typedChars: number;
-  correctChars: number;
   errors: number;
   elapsedMs: number;
   wpm: number;
@@ -41,8 +34,6 @@ interface LineState {
   typed: string;
   done: boolean;
 }
-
-type CompletionInfo = SessionSummary;
 
 export interface PracticeBoardProps {
   article: ParsedArticle;
@@ -70,6 +61,19 @@ function appendSkippedText(line: TypingLine, typed: string): string {
   while (position < line.chars.length && line.chars[position].skipped) {
     value += displaySourceChar(line.chars[position].char);
     position += 1;
+  }
+  return value;
+}
+
+/** 行尾连续的自动跳过字符被编辑时，先移除旧的自动补位，等下一次输入重新补齐 */
+function trimTrailingSkipped(line: TypingLine, typed: string): string {
+  let value = typed;
+  let index = line.chars.length - 1;
+  while (index >= 0 && line.chars[index].skipped) {
+    if (value.length === 0) break;
+    if (value[value.length - 1] !== displaySourceChar(line.chars[index].char)) break;
+    value = value.slice(0, -1);
+    index -= 1;
   }
   return value;
 }
@@ -111,11 +115,7 @@ function aggregateSummary(model: TypingModel, lineStates: LineState[], elapsedMs
   const accuracy = typedChars > 0 ? correctChars / typedChars : 1;
 
   return {
-    totalChars: model.totalChars,
-    requiredChars: model.totalTargets,
-    skippedChars: model.skippedChars,
     typedChars,
-    correctChars,
     errors,
     elapsedMs,
     wpm,
@@ -154,7 +154,7 @@ export default function PracticeBoard({
   const [pinned, setPinned] = useState<{ wordIndex: number; anchor: HTMLElement } | null>(null);
   const [draftSettings, setDraftSettings] = useState<SkipSettings>(skipSettings);
   const [autoAnchor, setAutoAnchor] = useState<HTMLElement | null>(null);
-  const [completion, setCompletion] = useState<CompletionInfo | null>(null);
+  const [completion, setCompletion] = useState<SessionSummary | null>(null);
   const [coverageOpen, setCoverageOpen] = useState(false);
 
   const lineInputRef = useRef<HTMLInputElement>(null);
@@ -162,7 +162,7 @@ export default function PracticeBoard({
   const wordRefs = useRef(new Map<number, HTMLElement>());
   const scrollRef = useRef<HTMLDivElement>(null);
   const startTimeRef = useRef<number | null>(null);
-  const completionRef = useRef<CompletionInfo | null>(null);
+  const completionRef = useRef<SessionSummary | null>(null);
 
   const currentLine = lineIndex >= 0 ? model.lines[lineIndex] : undefined;
   const currentState = lineIndex >= 0 ? lineStates[lineIndex] : undefined;
@@ -300,9 +300,8 @@ export default function PracticeBoard({
     const end = Date.now();
     const start = startTimeRef.current ?? end;
     const summary = aggregateSummary(model, finalStates, Math.max(0, end - start));
-    const info: CompletionInfo = summary;
-    completionRef.current = info;
-    setCompletion(info);
+    completionRef.current = summary;
+    setCompletion(summary);
     setNow(end);
     setStatus('finished');
   }
@@ -440,8 +439,8 @@ export default function PracticeBoard({
     const typed = currentState?.typed ?? '';
 
     if (start !== end) {
-      const nextTyped = typed.slice(0, start) + typed.slice(end);
-      applyTyped(nextTyped, start);
+      const nextTyped = trimTrailingSkipped(currentLine, typed.slice(0, start) + typed.slice(end));
+      applyTyped(nextTyped, Math.min(start, nextTyped.length));
       return;
     }
 
@@ -462,7 +461,8 @@ export default function PracticeBoard({
       if (!wasSkipped) break;
     } while (position > 0);
 
-    applyTyped(nextTyped, position);
+    nextTyped = trimTrailingSkipped(currentLine, nextTyped);
+    applyTyped(nextTyped, Math.min(position, nextTyped.length));
   }
 
   function handleDelete() {
@@ -473,8 +473,8 @@ export default function PracticeBoard({
     const typed = currentState?.typed ?? '';
 
     if (start === end && start >= typed.length) return;
-    const nextTyped = typed.slice(0, start) + typed.slice(end);
-    applyTyped(nextTyped, start);
+    const nextTyped = trimTrailingSkipped(currentLine, typed.slice(0, start) + typed.slice(end));
+    applyTyped(nextTyped, Math.min(start, nextTyped.length));
   }
 
   function handleInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -712,13 +712,13 @@ export default function PracticeBoard({
               <span
                 className="coverage-chip"
                 tabIndex={0}
-                role="status"
                 aria-label={`词库覆盖 ${Math.round(coverage.ratio * 100)}%`}
+                aria-describedby={coverageOpen ? 'coverage-uncovered' : undefined}
               >
                 词库覆盖 {Math.round(coverage.ratio * 100)}%
               </span>
               {coverageOpen ? (
-                <div className="coverage-tip" role="tooltip">
+                <div className="coverage-tip" id="coverage-uncovered" role="tooltip">
                   <div className="coverage-tip__head">
                     <strong>未覆盖单词</strong>
                     <span>

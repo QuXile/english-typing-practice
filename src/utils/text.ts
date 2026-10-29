@@ -469,7 +469,6 @@ export function findPreviousLineWithTargets(model: TypingModel, from: number): n
 
 export interface Coverage {
   total: number;
-  covered: number;
   ratio: number;
 }
 
@@ -482,7 +481,6 @@ export function countCoverage(words: WordToken[], dictionary: Record<string, unk
   }
   return {
     total: unique.size,
-    covered,
     ratio: unique.size ? covered / unique.size : 0,
   };
 }

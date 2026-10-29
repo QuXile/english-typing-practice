@@ -1,6 +1,6 @@
-export default function AppHeader({ compact = false }: { compact?: boolean }) {
+export default function AppHeader() {
   return (
-    <header className={`page-header${compact ? ' page-header--compact' : ''}`}>
+    <header className="page-header">
       <div className="brand">
         <span className="brand__mark" aria-hidden="true">
           Aa
