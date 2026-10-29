@@ -664,7 +664,11 @@ export default function PracticeBoard({
     );
   }
 
-  const progress = model.totalTargets > 0 ? (stats.typedChars / model.totalTargets) * 100 : 0;
+  const displayStats = completion ?? stats;
+  const displayElapsedMs = completion?.elapsedMs ?? elapsedMs;
+  const displayTypedChars = completion?.typedChars ?? stats.typedChars;
+  const displayProgress =
+    model.totalTargets > 0 ? (displayTypedChars / model.totalTargets) * 100 : 0;
   const belowEl = anchorEl && anchorEl.isConnected
     ? (anchorEl.closest('.article-row')?.querySelector('.line-input') as HTMLElement | null)
     : null;
@@ -672,7 +676,7 @@ export default function PracticeBoard({
   return (
     <div className="app-layout app-layout--practice">
       <main className="app-main app-main--practice">
-        <AppHeader compact />
+        <AppHeader />
 
         <div className="practice">
           <div className="practice-toolbar">
@@ -692,13 +696,13 @@ export default function PracticeBoard({
               {model.skippedChars > 0 ? (
                 <span className="skip-chip">跳过 {model.skippedChars} 字符</span>
               ) : null}
-              <span
-                className="coverage-chip"
-                title={`不重复单词中，有 ${coverage.covered} 个可在词库查到`}
-              >
-                词库覆盖 {Math.round(coverage.ratio * 100)}%
-              </span>
             </div>
+            <span
+              className="coverage-chip"
+              title={`不重复单词中，有 ${coverage.covered} 个可在词库查到`}
+            >
+              词库覆盖 {Math.round(coverage.ratio * 100)}%
+            </span>
           </div>
 
           <div className="panel article-panel">
@@ -805,74 +809,45 @@ export default function PracticeBoard({
 
           <div className="sidebar-progress sidebar-progress--top">
             <div className="sidebar-progress__head">
-              <span>{completion ? '当前进度' : '进度'}</span>
+              <span>进度</span>
               <strong>
-                {stats.typedChars} / {model.totalTargets}
+                {displayTypedChars} / {model.totalTargets}
               </strong>
             </div>
             <div className="progress progress--inline">
-              <div className="progress__bar" style={{ width: `${Math.min(100, progress)}%` }} />
+              <div className="progress__bar" style={{ width: `${Math.min(100, displayProgress)}%` }} />
+            </div>
+          </div>
+
+          <div className="sidebar-stats">
+            <div
+              className="sidebar-stat"
+              title="净 WPM：正确字符数 / 5 / 分钟，错误字符不计入"
+            >
+              <span>速度</span>
+              <strong>{Math.round(displayStats.wpm)}</strong>
+              <em>WPM</em>
+            </div>
+            <div className="sidebar-stat">
+              <span>正确率</span>
+              <strong>{Math.round(displayStats.accuracy * 100)}</strong>
+              <em>%</em>
+            </div>
+            <div className="sidebar-stat">
+              <span>用时</span>
+              <strong>{formatDuration(displayElapsedMs)}</strong>
+            </div>
+            <div className="sidebar-stat">
+              <span>错误</span>
+              <strong>{displayStats.errors}</strong>
             </div>
           </div>
 
           {completion ? (
-            <div className="completion-card">
-              <div className="completion-card__title">
-                <span aria-hidden="true">✓</span>
-                打字完成
-              </div>
-              <p className="completion-card__note">时间与成绩已锁定</p>
-              <div className="completion-card__grid">
-                <div>
-                  <span>用时</span>
-                  <strong>{formatDuration(completion.elapsedMs)}</strong>
-                </div>
-                <div>
-                  <span>速度</span>
-                  <strong>
-                    {Math.round(completion.wpm)}
-                    <em>WPM</em>
-                  </strong>
-                </div>
-                <div>
-                  <span>正确率</span>
-                  <strong>
-                    {Math.round(completion.accuracy * 100)}
-                    <em>%</em>
-                  </strong>
-                </div>
-                <div>
-                  <span>错误</span>
-                  <strong>{completion.errors}</strong>
-                </div>
-              </div>
-              <div className="completion-card__foot">
-                完成于 {formatClock(completion.finishedAt)}
-              </div>
-              <p className="completion-card__tip">仍可继续退格修改，或点击单词查词。</p>
+            <div className="sidebar-completion-time">
+              完成于 {formatClock(completion.finishedAt)}
             </div>
-          ) : (
-            <div className="sidebar-stats">
-              <div className="sidebar-stat">
-                <span>速度</span>
-                <strong>{Math.round(stats.wpm)}</strong>
-                <em>WPM</em>
-              </div>
-              <div className="sidebar-stat">
-                <span>正确率</span>
-                <strong>{Math.round(stats.accuracy * 100)}</strong>
-                <em>%</em>
-              </div>
-              <div className="sidebar-stat">
-                <span>用时</span>
-                <strong>{formatDuration(elapsedMs)}</strong>
-              </div>
-              <div className="sidebar-stat">
-                <span>错误</span>
-                <strong>{stats.errors}</strong>
-              </div>
-            </div>
-          )}
+          ) : null}
         </section>
 
         <section className="sidebar-card">
@@ -898,9 +873,14 @@ export default function PracticeBoard({
         </section>
 
         <div className="sidebar-foot">
-          <span>↑ / ↓ 切换行</span>
-          <span>Enter 输入 ↵</span>
-          <span>⌫ 退格</span>
+          <div className="sidebar-shortcuts">
+            <span>↑ / ↓ 切换行</span>
+            <span>Enter 输入 ↵</span>
+            <span>⌫ 退格</span>
+          </div>
+          <p className="sidebar-credit">
+            本地词库 · 离线可用 · 词条数据来自 ECDICT（MIT）与 ecdict-revised（CC BY-SA 4.0）
+          </p>
         </div>
       </aside>
 

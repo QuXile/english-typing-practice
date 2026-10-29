@@ -2970,3 +2970,84 @@ body {
 .page-header--compact .brand__copy {
   gap: 6px;
 }
+
+/* ============================================================
+   本轮反馈微调
+   ============================================================ */
+
+.practice-toolbar {
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.practice-toolbar__meta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.practice-toolbar .coverage-chip {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* 应用按钮和普通按钮统一，不再使用特殊渐变 */
+.app-sidebar .sidebar-apply {
+  width: 100%;
+  margin-top: 10px;
+  border: 1px solid #dfe5f1;
+  background: #fff;
+  color: #344054;
+  box-shadow: none;
+}
+
+.app-sidebar .sidebar-apply:hover {
+  border-color: #c7d2e6;
+  background: #f8faff;
+}
+
+/* 完成时不使用特殊卡片，只在原信息卡中更新时间 */
+.sidebar-completion-time {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #edf0f6;
+  color: #98a2b3;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 右侧栏底部：快捷键 + 词库来源 */
+.sidebar-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px solid #dde4ef;
+  color: #98a2b3;
+}
+
+.sidebar-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 14px;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+.sidebar-shortcuts span {
+  white-space: nowrap;
+}
+
+.sidebar-credit {
+  margin: 0;
+  color: #a0aabb;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.sidebar-credit {
+  color: #8b95a8;
+  font-size: 9.5px;
+}

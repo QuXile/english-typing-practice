@@ -80,12 +80,6 @@ export default function Index() {
       <main className="app-main">
         <AppHeader />
         <ImportPanel loading={loading} error={error} onStart={handleStart} />
-
-        <footer className="page-footer">
-          <span>本地词库 · 离线可用</span>
-          <span className="page-footer__dot">·</span>
-          <span>词条数据来自 ECDICT（MIT）与 ecdict-revised（CC BY-SA 4.0）</span>
-        </footer>
       </main>
 
       <aside className="app-sidebar">
@@ -122,9 +116,14 @@ export default function Index() {
         </section>
 
         <div className="sidebar-foot">
-          <span>↑ / ↓ 切换行</span>
-          <span>Enter 输入 ↵</span>
-          <span>⌫ 退格</span>
+          <div className="sidebar-shortcuts">
+            <span>↑ / ↓ 切换行</span>
+            <span>Enter 输入 ↵</span>
+            <span>⌫ 退格</span>
+          </div>
+          <p className="sidebar-credit">
+            本地词库 · 离线可用 · 词条数据来自 ECDICT（MIT）与 ecdict-revised（CC BY-SA 4.0）
+          </p>
         </div>
       </aside>
     </div>
