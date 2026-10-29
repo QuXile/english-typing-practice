@@ -1,14 +1,14 @@
 import { useState } from 'react';
+import AppHeader from '../Components/AppHeader';
 import ImportPanel from '../Components/ImportPanel';
 import PracticeBoard from '../Components/PracticeBoard';
-import type { SessionSummary } from '../Components/PracticeBoard';
-import ResultPanel from '../Components/ResultPanel';
+import PracticeSettings from '../Components/PracticeSettings';
 import type { Dictionary } from '../data/dictionary';
 import { loadDictionary } from '../data/dictionary';
 import type { Coverage, ParsedArticle, SkipSettings } from '../utils/text';
 import { DEFAULT_SKIP_SETTINGS, countCoverage, getArticleMaxChars, parseArticle } from '../utils/text';
 
-type Stage = 'import' | 'practice' | 'result';
+type Stage = 'import' | 'practice';
 
 interface ArticleState {
   parsed: ParsedArticle;
@@ -20,7 +20,6 @@ export default function Index() {
   const [stage, setStage] = useState<Stage>('import');
   const [dictionary, setDictionary] = useState<Dictionary | null>(null);
   const [article, setArticle] = useState<ArticleState | null>(null);
-  const [summary, setSummary] = useState<SessionSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionKey, setSessionKey] = useState(0);
@@ -38,7 +37,6 @@ export default function Index() {
       }
       const coverage = countCoverage(parsed.words, loaded);
       setArticle({ parsed, sourceName: payload.sourceName, coverage });
-      setSummary(null);
       setSessionKey((key) => key + 1);
       setStage('practice');
     } catch (caught) {
@@ -48,11 +46,6 @@ export default function Index() {
     }
   }
 
-  function handleFinish(result: SessionSummary) {
-    setSummary(result);
-    setStage('result');
-  }
-
   function handleApplySettings(next: SkipSettings) {
     setSkipSettings(next);
     setSessionKey((key) => key + 1);
@@ -60,80 +53,74 @@ export default function Index() {
 
   function restartPractice() {
     setSessionKey((key) => key + 1);
-    setStage('practice');
   }
 
   function exitToImport() {
     setStage('import');
-    setSummary(null);
+  }
+
+  if (stage === 'practice' && article && dictionary) {
+    return (
+      <PracticeBoard
+        key={sessionKey}
+        article={article.parsed}
+        dictionary={dictionary}
+        sourceName={article.sourceName}
+        coverage={article.coverage}
+        skipSettings={skipSettings}
+        onApplySettings={handleApplySettings}
+        onRestart={restartPractice}
+        onExit={exitToImport}
+      />
+    );
   }
 
   return (
-    <div className={`page-shell${stage === 'practice' ? ' page-shell--practice' : ''}`}>
-      <header className="page-header">
-        <h1 className="page-header__title">English Typing Practice</h1>
-        <div className="page-header__eyebrow">Read · Type · Learn</div>
-      </header>
+    <div className="app-layout app-layout--import">
+      <main className="app-main">
+        <AppHeader />
+        <ImportPanel loading={loading} error={error} onStart={handleStart} />
 
-      {stage === 'import' ? (
-        <>
-          <ImportPanel
-            loading={loading}
-            error={error}
-            skipSettings={skipSettings}
-            onSkipSettingsChange={setSkipSettings}
-            onStart={handleStart}
-          />
-          <ul className="feature-list">
+        <footer className="page-footer">
+          <span>本地词库 · 离线可用</span>
+          <span className="page-footer__dot">·</span>
+          <span>词条数据来自 ECDICT（MIT）与 ecdict-revised（CC BY-SA 4.0）</span>
+        </footer>
+      </main>
+
+      <aside className="app-sidebar">
+        <section className="sidebar-card">
+          <div className="sidebar-card__head">
+            <h2 className="sidebar-card__title">练习设置</h2>
+            <span className="sidebar-card__eyebrow">SETTINGS</span>
+          </div>
+          <PracticeSettings value={skipSettings} onChange={setSkipSettings} compact />
+          <p className="sidebar-hint">
+            默认全部关闭。开启跳过后，对应字符会自动填入输入框；中文标点会转成半角，无法输入的字符会替换为空格。
+          </p>
+        </section>
+
+        <section className="sidebar-card">
+          <div className="sidebar-card__head">
+            <h2 className="sidebar-card__title">使用提示</h2>
+            <span className="sidebar-card__eyebrow">TIPS</span>
+          </div>
+          <ul className="sidebar-help">
             <li>
-              <span className="feature-list__icon">01</span>
-              <div>
-                <strong>导入文章</strong>
-                <p>粘贴任意英文文本，或读取本地的 .txt 文件。</p>
-              </div>
+              <span className="sidebar-help__num">01</span>
+              <p>粘贴文章或导入 .txt，点击「开始练习」。</p>
             </li>
             <li>
-              <span className="feature-list__icon">02</span>
-              <div>
-                <strong>逐行对照</strong>
-                <p>原文在上、输入框在下，使用同一套等宽排版；正确/错误会标在原文行上。</p>
-              </div>
+              <span className="sidebar-help__num">02</span>
+              <p>点击原文中的单词可查看释义；点击任意行可以切回去修改。</p>
             </li>
             <li>
-              <span className="feature-list__icon">03</span>
-              <div>
-                <strong>点击查词</strong>
-                <p>点击原文里的任意单词，查看释义、音标、范围和词频。</p>
-              </div>
+              <span className="sidebar-help__num">03</span>
+              <p>完成后成绩会显示在右侧，仍可继续退格修改或查词。</p>
             </li>
           </ul>
-        </>
-      ) : null}
-
-      {stage === 'practice' && article && dictionary ? (
-        <PracticeBoard
-          key={sessionKey}
-          article={article.parsed}
-          dictionary={dictionary}
-          sourceName={article.sourceName}
-          coverage={article.coverage}
-          skipSettings={skipSettings}
-          onApplySettings={handleApplySettings}
-          onFinish={handleFinish}
-          onRestart={restartPractice}
-          onExit={exitToImport}
-        />
-      ) : null}
-
-      {stage === 'result' && summary ? (
-        <ResultPanel summary={summary} onRestart={restartPractice} onExit={exitToImport} />
-      ) : null}
-
-      <footer className="page-footer">
-        <span>本地词库 · 离线可用</span>
-        <span className="page-footer__dot">·</span>
-        <span>词条数据来自 ECDICT（MIT）与 ecdict-revised（CC BY-SA 4.0）</span>
-      </footer>
+        </section>
+      </aside>
     </div>
   );
 }

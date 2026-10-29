@@ -1,8 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
-import type { SkipSettings } from '../utils/text';
 import { MAX_ARTICLE_CHARS, MAX_ARTICLE_WORDS, parseArticle } from '../utils/text';
-import PracticeSettings from './PracticeSettings';
 
 export interface ImportPayload {
   text: string;
@@ -12,8 +10,6 @@ export interface ImportPayload {
 export interface ImportPanelProps {
   loading: boolean;
   error?: string | null;
-  skipSettings: SkipSettings;
-  onSkipSettingsChange: (next: SkipSettings) => void;
   onStart: (payload: ImportPayload) => void;
 }
 
@@ -36,8 +32,6 @@ function formatBytes(bytes: number): string {
 export default function ImportPanel({
   loading,
   error,
-  skipSettings,
-  onSkipSettingsChange,
   onStart,
 }: ImportPanelProps) {
   const [mode, setMode] = useState<ImportMode>('paste');
@@ -185,14 +179,6 @@ export default function ImportPanel({
           <p className="dropzone__hint">支持 UTF-8 文本，最大 1MB{fileName ? ` · ${formatBytes(new Blob([text]).size)}` : ''}</p>
         </div>
       )}
-
-      <div className="settings-inline">
-        <div className="settings-inline__head">
-          <strong>练习设置</strong>
-          <span>默认全部关闭：空格、标点、数字和换行符都需要自己输入；开启跳过后，对应字符会自动填入输入框。中文标点会自动转成半角，无法输入的字符会替换为空格。</span>
-        </div>
-        <PracticeSettings value={skipSettings} onChange={onSkipSettingsChange} />
-      </div>
 
       <div className="import-meta">
         <div className="import-meta__counts">

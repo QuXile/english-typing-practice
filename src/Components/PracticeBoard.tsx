@@ -16,6 +16,7 @@ import {
   findPreviousLineWithTargets,
   formatDuration,
 } from '../utils/text';
+import AppHeader from './AppHeader';
 import PracticeSettings from './PracticeSettings';
 import WordTip from './WordTip';
 
@@ -41,6 +42,10 @@ interface LineState {
   done: boolean;
 }
 
+interface CompletionInfo extends SessionSummary {
+  finishedAt: number;
+}
+
 export interface PracticeBoardProps {
   article: ParsedArticle;
   dictionary: Dictionary;
@@ -48,7 +53,6 @@ export interface PracticeBoardProps {
   coverage: Coverage;
   skipSettings: SkipSettings;
   onApplySettings: (next: SkipSettings) => void;
-  onFinish: (summary: SessionSummary) => void;
   onRestart: () => void;
   onExit: () => void;
 }
@@ -126,6 +130,15 @@ function displaySourceChar(char: string): string {
   return char === '\n' ? '↵' : char;
 }
 
+function formatClock(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString('zh-CN', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
 export default function PracticeBoard({
   article,
   dictionary,
@@ -133,7 +146,6 @@ export default function PracticeBoard({
   coverage,
   skipSettings,
   onApplySettings,
-  onFinish,
   onRestart,
   onExit,
 }: PracticeBoardProps) {
@@ -150,18 +162,19 @@ export default function PracticeBoard({
   const [caret, setCaret] = useState(0);
   const [status, setStatus] = useState<'ready' | 'running' | 'finished'>('ready');
   const [focused, setFocused] = useState(true);
-  const [cardDismissed, setCardDismissed] = useState(false);
+  const [cardDismissed, setCardDismissed] = useState(true);
   const [now, setNow] = useState(() => Date.now());
   const [pinned, setPinned] = useState<{ wordIndex: number; anchor: HTMLElement } | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [draftSettings, setDraftSettings] = useState<SkipSettings>(skipSettings);
   const [autoAnchor, setAutoAnchor] = useState<HTMLElement | null>(null);
+  const [completion, setCompletion] = useState<CompletionInfo | null>(null);
 
   const lineInputRef = useRef<HTMLInputElement>(null);
   const pendingSelectionRef = useRef<number | null>(null);
   const wordRefs = useRef(new Map<number, HTMLElement>());
   const scrollRef = useRef<HTMLDivElement>(null);
   const startTimeRef = useRef<number | null>(null);
+  const completionRef = useRef<CompletionInfo | null>(null);
 
   const currentLine = lineIndex >= 0 ? model.lines[lineIndex] : undefined;
   const currentState = lineIndex >= 0 ? lineStates[lineIndex] : undefined;
@@ -220,7 +233,6 @@ export default function PracticeBoard({
   }, [status]);
 
   useEffect(() => {
-    if (status === 'finished') return;
     const container = scrollRef.current;
     if (!container) return;
 
@@ -243,7 +255,7 @@ export default function PracticeBoard({
     if (Math.abs(target - currentTop) > 1) {
       container.scrollTo({ top: target, behavior: 'smooth' });
     }
-  }, [lineIndex, status]);
+  }, [lineIndex]);
 
   function focusInput() {
     lineInputRef.current?.focus();
@@ -257,13 +269,17 @@ export default function PracticeBoard({
   }
 
   function finish(finalStates: LineState[]) {
+    setLineStates(finalStates);
+    if (completionRef.current) return;
+
     const end = Date.now();
     const start = startTimeRef.current ?? end;
     const summary = aggregateSummary(model, finalStates, Math.max(0, end - start));
-    setLineStates(finalStates);
+    const info: CompletionInfo = { ...summary, finishedAt: end };
+    completionRef.current = info;
+    setCompletion(info);
     setNow(end);
     setStatus('finished');
-    onFinish(summary);
   }
 
   function completeLine(typed: string) {
@@ -333,7 +349,7 @@ export default function PracticeBoard({
   }
 
   function handleNativeInput(value: string, caret: number) {
-    if (!currentLine || status === 'finished') return;
+    if (!currentLine) return;
     normalizeInput(value, caret, caret >= value.length);
   }
 
@@ -392,7 +408,7 @@ export default function PracticeBoard({
   }
 
   function handleBackspace() {
-    if (!currentLine || status === 'finished') return;
+    if (!currentLine) return;
     const input = lineInputRef.current;
     const start = input?.selectionStart ?? 0;
     const end = input?.selectionEnd ?? start;
@@ -425,7 +441,7 @@ export default function PracticeBoard({
   }
 
   function handleDelete() {
-    if (!currentLine || status === 'finished') return;
+    if (!currentLine) return;
     const input = lineInputRef.current;
     const start = input?.selectionStart ?? 0;
     const end = input?.selectionEnd ?? start;
@@ -437,7 +453,7 @@ export default function PracticeBoard({
   }
 
   function handleInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.nativeEvent.isComposing || status === 'finished' || !currentLine) return;
+    if (event.nativeEvent.isComposing || !currentLine) return;
 
     const input = lineInputRef.current;
     const start = input?.selectionStart ?? 0;
@@ -589,194 +605,233 @@ export default function PracticeBoard({
     : null;
 
   return (
-    <section className="practice">
-      <div className="practice-toolbar">
-        <div className="practice-toolbar__meta">
-          <span className="source-name" title={sourceName}>
-            {sourceName}
-          </span>
-          <span className="line-counter">
-            第 {lineIndex + 1} / {model.lines.length} 行
-          </span>
-          <span className="char-counter">
-            {stats.typedChars} / {model.totalTargets} 字符
-          </span>
-          {model.skippedChars > 0 ? <span className="skip-chip">跳过 {model.skippedChars} 字符</span> : null}
-          <span
-            className="coverage-chip"
-            title={`不重复单词中，有 ${coverage.covered} 个可在词库查到`}
-          >
-            词库覆盖 {Math.round(coverage.ratio * 100)}%
-          </span>
+    <div className="app-layout app-layout--practice">
+      <main className="app-main app-main--practice">
+        <AppHeader compact />
+
+        <div className="practice">
+          <div className="practice-toolbar">
+            <div className="practice-toolbar__meta">
+              <span className="source-name" title={sourceName}>
+                {sourceName}
+              </span>
+              <span className="line-counter">
+                第 {lineIndex + 1} / {model.lines.length} 行
+              </span>
+              <span className="char-counter">
+                {stats.typedChars} / {model.totalTargets} 字符
+              </span>
+              {model.skippedChars > 0 ? (
+                <span className="skip-chip">跳过 {model.skippedChars} 字符</span>
+              ) : null}
+              <span
+                className="coverage-chip"
+                title={`不重复单词中，有 ${coverage.covered} 个可在词库查到`}
+              >
+                词库覆盖 {Math.round(coverage.ratio * 100)}%
+              </span>
+            </div>
+          </div>
+
+          <div className="panel article-panel">
+            <div
+              ref={scrollRef}
+              className={`article-lines${focused ? '' : ' article-lines--inactive'}`}
+              onClick={() => {
+                setPinned(null);
+                setCardDismissed(true);
+                focusInput();
+              }}
+              role="presentation"
+            >
+              {model.lines.map((line) => {
+                if (line.text.trim() === '') {
+                  return (
+                    <div
+                      className="article-row article-row--blank"
+                      data-line-index={line.index}
+                      key={line.index}
+                    />
+                  );
+                }
+
+                const state = lineStates[line.index];
+                const isCurrent = line.index === lineIndex;
+                const isDone = Boolean(state?.done);
+                const max = line.chars.length;
+
+                return (
+                  <div
+                    className={`article-row${isCurrent ? ' article-row--current' : ''}${
+                      isDone ? ' article-row--done' : ''
+                    }`}
+                    data-line-index={line.index}
+                    key={line.index}
+                    onClick={(event) => {
+                      if (isCurrent) return;
+                      event.stopPropagation();
+                      const target = event.target as HTMLElement;
+                      const clickedInput = target.closest('.line-input') as HTMLInputElement | null;
+                      activateLine(line.index, clickedInput?.selectionStart ?? undefined);
+                    }}
+                  >
+                    <div className="source-line">{renderSourceLine(line, state)}</div>
+                    <input
+                      ref={isCurrent ? lineInputRef : undefined}
+                      className={`line-input${isCurrent ? ' line-input--current' : isDone ? ' line-input--done' : ' line-input--pending'}`}
+                      type="text"
+                      value={state?.typed ?? ''}
+                      maxLength={max}
+                      readOnly={!isCurrent}
+                      tabIndex={isCurrent ? 0 : -1}
+                      onChange={
+                        isCurrent
+                          ? (event) => {
+                              const input = event.currentTarget;
+                              handleNativeInput(input.value, input.selectionStart ?? input.value.length);
+                            }
+                          : undefined
+                      }
+                      onKeyDown={isCurrent ? handleInputKeyDown : undefined}
+                      onSelect={isCurrent ? handleInputSelect : undefined}
+                      onFocus={isCurrent ? () => setFocused(true) : undefined}
+                      onBlur={
+                        isCurrent
+                          ? () => {
+                              setFocused(false);
+                              setPinned(null);
+                              setCardDismissed(true);
+                            }
+                          : undefined
+                      }
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      autoComplete="off"
+                      spellCheck={false}
+                      aria-label={isCurrent ? '当前行输入' : '已输入内容'}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            {!focused ? (
+              <button type="button" className="focus-hint" onClick={focusInput}>
+                点击文章继续输入
+              </button>
+            ) : null}
+          </div>
         </div>
-        <div className="practice-toolbar__actions">
+      </main>
+
+      <aside className="app-sidebar app-sidebar--practice">
+        <section className={`sidebar-card sidebar-card--status${completion ? ' sidebar-card--completed' : ''}`}>
+          <div className="sidebar-status-head">
+            <span className="sidebar-card__eyebrow">TYPING</span>
+            <span
+              className={`status-pill${completion ? ' status-pill--done' : status === 'running' ? ' status-pill--running' : ''}`}
+            >
+              {completion ? '已完成' : status === 'running' ? '计时中' : '准备中'}
+            </span>
+          </div>
+
+          {completion ? (
+            <div className="completion-card">
+              <div className="completion-card__title">
+                <span aria-hidden="true">✓</span>
+                打字完成
+              </div>
+              <p className="completion-card__note">时间与成绩已锁定</p>
+              <div className="completion-card__grid">
+                <div>
+                  <span>用时</span>
+                  <strong>{formatDuration(completion.elapsedMs)}</strong>
+                </div>
+                <div>
+                  <span>速度</span>
+                  <strong>
+                    {Math.round(completion.wpm)}
+                    <em>WPM</em>
+                  </strong>
+                </div>
+                <div>
+                  <span>正确率</span>
+                  <strong>
+                    {Math.round(completion.accuracy * 100)}
+                    <em>%</em>
+                  </strong>
+                </div>
+                <div>
+                  <span>错误</span>
+                  <strong>{completion.errors}</strong>
+                </div>
+              </div>
+              <div className="completion-card__foot">
+                完成于 {formatClock(completion.finishedAt)}
+              </div>
+              <p className="completion-card__tip">仍可继续退格修改，或点击单词查词。</p>
+            </div>
+          ) : (
+            <div className="sidebar-stats">
+              <div className="sidebar-stat">
+                <span>速度</span>
+                <strong>{Math.round(stats.wpm)}</strong>
+                <em>WPM</em>
+              </div>
+              <div className="sidebar-stat">
+                <span>正确率</span>
+                <strong>{Math.round(stats.accuracy * 100)}</strong>
+                <em>%</em>
+              </div>
+              <div className="sidebar-stat">
+                <span>用时</span>
+                <strong>{formatDuration(elapsedMs)}</strong>
+              </div>
+              <div className="sidebar-stat">
+                <span>错误</span>
+                <strong>{stats.errors}</strong>
+              </div>
+            </div>
+          )}
+
+          <div className="sidebar-progress">
+            <div className="sidebar-progress__head">
+              <span>{completion ? '当前进度' : '进度'}</span>
+              <strong>
+                {stats.typedChars} / {model.totalTargets}
+              </strong>
+            </div>
+            <div className="progress progress--inline">
+              <div className="progress__bar" style={{ width: `${Math.min(100, progress)}%` }} />
+            </div>
+          </div>
+        </section>
+
+        <section className="sidebar-card">
+          <div className="sidebar-card__head">
+            <h2 className="sidebar-card__title">练习设置</h2>
+            <span className="sidebar-card__eyebrow">SETTINGS</span>
+          </div>
+          <p className="sidebar-hint">修改后将从文章开头重新计时。</p>
+          <PracticeSettings value={draftSettings} onChange={setDraftSettings} compact />
           <button
             type="button"
-            className="button button--ghost"
-            onClick={() => {
-              setDraftSettings(skipSettings);
-              setSettingsOpen((open) => !open);
-            }}
-            aria-expanded={settingsOpen}
+            className="button button--ghost sidebar-apply"
+            onClick={() => onApplySettings(draftSettings)}
           >
-            设置
+            应用并重新开始
           </button>
+        </section>
+
+        <section className="sidebar-card sidebar-card--actions">
           <button type="button" className="button button--ghost" onClick={onRestart}>
             重新开始
           </button>
           <button type="button" className="button button--text" onClick={onExit}>
-            换文章
+            换一篇文章
           </button>
-
-          {settingsOpen ? (
-            <div className="settings-popover" role="dialog" aria-label="练习设置">
-              <div className="settings-popover__head">
-                <strong>练习设置</strong>
-                <span>修改后将从开头重新练习</span>
-              </div>
-              <PracticeSettings value={draftSettings} onChange={setDraftSettings} compact />
-              <div className="settings-popover__actions">
-                <button
-                  type="button"
-                  className="button button--text"
-                  onClick={() => {
-                    setSettingsOpen(false);
-                    focusInput();
-                  }}
-                >
-                  取消
-                </button>
-                <button
-                  type="button"
-                  className="button button--primary"
-                  onClick={() => {
-                    setSettingsOpen(false);
-                    onApplySettings(draftSettings);
-                  }}
-                >
-                  应用并重新开始
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="stats-row">
-        <div className="stat">
-          <span className="stat__label">速度</span>
-          <span className="stat__value">{Math.round(stats.wpm)}</span>
-          <span className="stat__unit">WPM</span>
-        </div>
-        <div className="stat">
-          <span className="stat__label">正确率</span>
-          <span className="stat__value">{Math.round(stats.accuracy * 100)}</span>
-          <span className="stat__unit">%</span>
-        </div>
-        <div className="stat">
-          <span className="stat__label">用时</span>
-          <span className="stat__value stat__value--time">{formatDuration(elapsedMs)}</span>
-        </div>
-        <div className="stat stat--progress">
-          <span className="stat__label">进度</span>
-          <span className="stat__value">
-            {stats.typedChars}
-            <span className="stat__unit"> / {model.totalTargets}</span>
-          </span>
-          <div className="progress progress--inline">
-            <div className="progress__bar" style={{ width: `${Math.min(100, progress)}%` }} />
-          </div>
-        </div>
-      </div>
-
-      <div className="panel article-panel">
-        <div
-          ref={scrollRef}
-          className={`article-lines${focused ? '' : ' article-lines--inactive'}`}
-          onClick={() => {
-            setPinned(null);
-            setCardDismissed(true);
-            focusInput();
-          }}
-          role="presentation"
-        >
-          {model.lines.map((line) => {
-            if (line.text.trim() === '') {
-              return (
-                <div
-                  className="article-row article-row--blank"
-                  data-line-index={line.index}
-                  key={line.index}
-                />
-              );
-            }
-
-            const state = lineStates[line.index];
-            const isCurrent = line.index === lineIndex;
-            const isDone = Boolean(state?.done);
-            const max = line.chars.length;
-
-            return (
-              <div
-                className={`article-row${isCurrent ? ' article-row--current' : ''}${
-                  isDone ? ' article-row--done' : ''
-                }`}
-                data-line-index={line.index}
-                key={line.index}
-                onClick={(event) => {
-                  if (isCurrent) return;
-                  event.stopPropagation();
-                  const target = event.target as HTMLElement;
-                  const clickedInput = target.closest('.line-input') as HTMLInputElement | null;
-                  activateLine(line.index, clickedInput?.selectionStart ?? undefined);
-                }}
-              >
-                <div className="source-line">{renderSourceLine(line, state)}</div>
-                <input
-                  ref={isCurrent ? lineInputRef : undefined}
-                  className={`line-input${isCurrent ? ' line-input--current' : isDone ? ' line-input--done' : ' line-input--pending'}`}
-                  type="text"
-                  value={state?.typed ?? ''}
-                  maxLength={max}
-                  readOnly={!isCurrent}
-                  tabIndex={isCurrent ? 0 : -1}
-                  onChange={
-                    isCurrent
-                      ? (event) => {
-                          const input = event.currentTarget;
-                          handleNativeInput(input.value, input.selectionStart ?? input.value.length);
-                        }
-                      : undefined
-                  }
-                  onKeyDown={isCurrent ? handleInputKeyDown : undefined}
-                  onSelect={isCurrent ? handleInputSelect : undefined}
-                  onFocus={isCurrent ? () => setFocused(true) : undefined}
-                  onBlur={
-                    isCurrent
-                      ? () => {
-                          setFocused(false);
-                          setPinned(null);
-                          setCardDismissed(true);
-                        }
-                      : undefined
-                  }
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  autoComplete="off"
-                  spellCheck={false}
-                  aria-label={isCurrent ? '当前行输入' : '已输入内容'}
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        {!focused ? (
-          <button type="button" className="focus-hint" onClick={focusInput}>
-            点击文章继续输入
-          </button>
-        ) : null}
-      </div>
+        </section>
+      </aside>
 
       <WordTip
         word={activeWord?.text || ''}
@@ -784,8 +839,8 @@ export default function PracticeBoard({
         anchorEl={anchorEl}
         belowEl={belowEl}
         repositionKey={`${lineIndex}:${caret}:${status}`}
-        visible={focused && !cardDismissed && !settingsOpen && Boolean(anchorEl) && status !== 'finished'}
+        visible={focused && !cardDismissed && Boolean(anchorEl)}
       />
-    </section>
+    </div>
   );
 }

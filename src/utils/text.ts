@@ -34,7 +34,7 @@ export const MAX_ARTICLE_WORDS = 20000;
 export const MAX_ARTICLE_CHARS = 500000;
 
 const WORD_RE = /[A-Za-z]+(?:['\-][A-Za-z]+)*/g;
-const DEFAULT_MAX_LINE_CHARS = 74;
+const DEFAULT_MAX_LINE_CHARS = 82;
 
 const MONO_FONT_FAMILY = 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
 let monoCharWidthCache: { fontSize: number; width: number } | null = null;
@@ -79,8 +79,14 @@ export function getArticleMaxChars(viewportWidth = typeof window === 'undefined'
   const inlinePadding = mobile ? 18 : 22;
   // 滚动条 8px + 右侧留白 6px
   const scrollbarReserve = 14;
-  const pageWidth = Math.min(viewportWidth, 980);
-  const available = pageWidth - pagePadding - panelPadding - rowPadding - inlinePadding - scrollbarReserve;
+
+  const mainElement =
+    typeof document === 'undefined' ? null : document.querySelector<HTMLElement>('.app-main');
+  const measuredMainWidth = mainElement?.getBoundingClientRect().width ?? 0;
+  const mainWidth =
+    measuredMainWidth > 240 ? measuredMainWidth : Math.min(viewportWidth, 980) - pagePadding;
+
+  const available = mainWidth - panelPadding - rowPadding - inlinePadding - scrollbarReserve;
   const fontSize = mobile ? 16 : 18;
   const charWidth = measureMonoCharWidth(fontSize);
 
