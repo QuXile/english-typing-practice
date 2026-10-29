@@ -103,10 +103,10 @@ node build-app-dict.mjs
 
 输出 `src/data/generated/dictionary.json`：
 
-- **headwords**：考纲 / 高频 / 核心单字词，含释义、音标、考纲标签、frq/bnc；
+- **headwords**：考纲 / 高频 / 核心单字词，并补充常见 BNC 排名词（避免 an 这类缺 FRQ/标签的常见词漏收），含释义、音标、考纲标签、frq/bnc；
 - **aliases**：变形词 → 原形（`went → go`、`wrapped → wrap`、`was → be`），文章里遇到变位词会回退到原形释义，同时保留变形词自己的音标；
 - **forms / lemma**：来自 ECDICT `exchange`，记录过去式、过去分词、现在分词、三单、复数、比较级、最高级；`lemma` 表示该词本身是某原形的变形；
-- 当前约 43,000 个 headwords + 29,000 个 aliases，文件约 6.7MB，gzip 约 2.1MB，前端按需动态加载。
+- 当前约 44,538 个 headwords + 29,352 个 aliases（共 73,890 个 key），文件约 6.8MB，gzip 约 2.12MB，前端按需动态加载。
 
 示例节点：
 
